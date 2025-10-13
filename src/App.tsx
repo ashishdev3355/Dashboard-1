@@ -23,6 +23,7 @@ import FaultCodesUploader2 from "./Services/FaultCodesUploader2.tsx";
 import FaultCodeSymptoms from "./Services/FaultCodeSymptoms.tsx";
 import FaultCodeSolutions from "./Services/FaultCodeSolutions.tsx";
 import FaultCodeCauses from "./Services/FaultCodeCauses.tsx";
+import FaultCodeList from "./Services/FaultCodeList.tsx";
 // import Signup from "./pages/Signup.tsx";
 import Login from "./pages/Login.tsx";
 import RequireAuth from "./RequireAuth.tsx";
@@ -64,6 +65,7 @@ function App() {
           <Route path="FaultCodeSymptoms" element={<FaultCodeSymptoms />} />
           <Route path="FaultCodeSolutions" element={<FaultCodeSolutions />} />
           <Route path="FaultCodeCauses" element={<FaultCodeCauses />} />
+          <Route path="FaultCodeList" element={<FaultCodeList />} />
         </Route>
       </Routes>
     </BrowserRouter>

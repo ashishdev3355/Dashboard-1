@@ -22,6 +22,7 @@ const menuItems: MenuItem[] = [
   { label: "Fault Code Symptoms", path: "/FaultCodeSymptoms" },
   { label: "Fault Code Solutions", path: "/FaultCodeSolutions" },
   { label: "Fault Code Causes", path: "/FaultCodeCauses" },
+  { label: "Fault Code List", path: "/FaultCodeList" },
   { label: "Update commands", path: "/Updatecommand" },
   { label: "Fault Codes Uploader", path: "/FaultCodesUploader" },
   { label: "Fault Codes Uploader 2", path: "/FaultCodesUploader2" },
