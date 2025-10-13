@@ -3,10 +3,6 @@ import * as XLSX from 'xlsx';
 import HeaderAndValue from "../ReusedCompontets/HeaderAndValue"
 import { useNavigate } from "react-router-dom";
 
-// inside component
-// const navigate = useNavigate();
-
-
 interface DecodedArrayItem {
   pid: string;
   data: string;
@@ -74,10 +70,21 @@ const Scandetail = () => {
     type: '',
     app_version: '',
   });
-  const [page, setPage] = useState(1);
+  
+  // ✅ Initialize page from sessionStorage
+  const [page, setPage] = useState(() => {
+    const savedPage = sessionStorage.getItem('scanDetailPage');
+    return savedPage ? parseInt(savedPage, 10) : 1;
+  });
+  
   const [total, setTotal] = useState(0);
 
   const navigate = useNavigate(); 
+
+  // ✅ Save page to sessionStorage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('scanDetailPage', page.toString());
+  }, [page]);
 
   const fetchData = async () => {
     try {
@@ -91,7 +98,7 @@ const Scandetail = () => {
       const response = await fetch(`${API_BASE_URL}api/ScanDetail?${params.toString()}`,{
          headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ attach token
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
@@ -117,12 +124,10 @@ const Scandetail = () => {
     try {
       setLoading(true);
       
-      // Fetch all data without pagination
       const params = new URLSearchParams({
         ...filters,
       });
       
-      // Don't add page and limit to get all data
       const response = await fetch(`${API_BASE_URL}api/ScanDetail?${params.toString()}`);
       
       if (!response.ok) throw new Error('Failed to fetch scan report');
@@ -130,7 +135,6 @@ const Scandetail = () => {
       const json = await response.json();
       
       if (json && Array.isArray(json.scans) && json.scans.length > 0) {
-        // Prepare data for Excel
         const excelData = json.scans.map((scan: ScanItem) => ({
           'Email': scan.email,
           'Start Time': new Date(scan.scan_start_time).toLocaleString(),
@@ -147,15 +151,12 @@ const Scandetail = () => {
           'PDF Report': scan.pdf_report || 'No Report'
         }));
         
-        // Create workbook and worksheet
         const ws = XLSX.utils.json_to_sheet(excelData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Scan Details');
         
-        // Generate filename
         const filename = `Scan_Details_${filters.make || 'All'}_${filters.email || 'All'}_${new Date().toISOString().split('T')[0]}.xlsx`;
         
-        // Download file
         XLSX.writeFile(wb, filename);
       } else {
         alert('No data available to download');
@@ -178,7 +179,6 @@ const Scandetail = () => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Generate page numbers to show
   const generatePageNumbers = () => {
     const pages = [];
     const maxVisiblePages = 5;
@@ -186,7 +186,6 @@ const Scandetail = () => {
     let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2));
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
     
-    // Adjust start page if we're near the end
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
@@ -204,12 +203,9 @@ const Scandetail = () => {
       {error && <p className="text-red-500">{error}</p>}
 
       <div className="flex flex-col gap-4 mb-6">
-        {/* Filters row */}
-       
-
         <form
             onSubmit={(e) => {
-              e.preventDefault(); // prevent page reload
+              e.preventDefault();
               setPage(1);
               fetchData();
             }}
@@ -235,7 +231,7 @@ const Scandetail = () => {
               ))}
 
               <button
-                type="submit" // ✅ makes Enter key work
+                type="submit"
                 className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition-all"
               >
                 Filter
@@ -243,8 +239,6 @@ const Scandetail = () => {
             </div>
           </form>
 
-        
-        {/* Excel Download Button */}
         <div className="flex justify-center">
           <button
             onClick={downloadExcel}
@@ -310,17 +304,6 @@ const Scandetail = () => {
                 )}
               </td>
               <td className="border px-4 py-2">
-                {/* <button
-                  onClick={() => {
-                    // Mock navigation - in real app use navigate
-                    console.log('Navigate to details with scan data:', scan.id);
-                  }}
-                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                >
-                  View Details
-                </button> */}
-
-                
                 <button
                   onClick={() =>
                     navigate("/ObdScanReport/details", {
@@ -348,10 +331,8 @@ const Scandetail = () => {
         </tbody>
       </table>
 
-      {/* ✅ New Pagination Design */}
       {totalPages > 1 && (
         <div className="mt-6 flex flex-col items-center space-y-4">
-          {/* Pagination buttons */}
           <div className="flex items-center space-x-1">
             <button
               className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -384,7 +365,6 @@ const Scandetail = () => {
             </button>
           </div>
 
-          {/* Showing results text */}
           <p className="text-gray-600 text-sm">
             Showing page {page} of {totalPages || 1} ({total} total items)
           </p>
@@ -395,4 +375,3 @@ const Scandetail = () => {
 };
 
 export default Scandetail;
-
