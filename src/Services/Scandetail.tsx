@@ -71,7 +71,7 @@ const Scandetail = () => {
     app_version: '',
   });
   
-  // ✅ Initialize page from sessionStorage
+  // Initialize page from sessionStorage
   const [page, setPage] = useState(() => {
     const savedPage = sessionStorage.getItem('scanDetailPage');
     return savedPage ? parseInt(savedPage, 10) : 1;
@@ -81,7 +81,7 @@ const Scandetail = () => {
 
   const navigate = useNavigate(); 
 
-  // ✅ Save page to sessionStorage whenever it changes
+  // Save page to sessionStorage whenever it changes
   useEffect(() => {
     sessionStorage.setItem('scanDetailPage', page.toString());
   }, [page]);
@@ -108,6 +108,16 @@ const Scandetail = () => {
       if (json && Array.isArray(json.scans)) {
         setScans(json.scans);
         setTotal(json.total || 0);
+        
+        // Cache the data in sessionStorage
+        sessionStorage.setItem('scanDetailCache', JSON.stringify({
+          scans: json.scans,
+          total: json.total || 0,
+          page: page,
+          filters: filters,
+          timestamp: Date.now()
+        }));
+        console.log('💾 Cached scan data');
       } else {
         setError('Invalid response format');
       }
@@ -173,6 +183,112 @@ const Scandetail = () => {
     fetchData();
   }, [page]);
 
+  // ✅ Restore scroll position after data loads
+  useEffect(() => {
+    if (!loading && scans.length > 0) {
+      // Check if we're returning from details page
+      const returningFromDetails = sessionStorage.getItem('returningToScanPage');
+      
+      // Use a unique key for this page
+      const savedScrollPosition = sessionStorage.getItem('scanDetailPage_ScrollPosition');
+      console.log('Raw saved position from storage:', savedScrollPosition);
+      console.log('Returning from details?', returningFromDetails);
+      
+      if (returningFromDetails === 'true') {
+        
+        if (savedScrollPosition && savedScrollPosition !== '0') {
+          const scrollPos = parseInt(savedScrollPosition, 10);
+          console.log('🎯 Restoring scroll position:', scrollPos);
+          
+          if (scrollPos > 0) {
+            // Multiple attempts to ensure scroll happens
+            const scrollAttempts = [0, 50, 100, 200, 300, 400, 500];
+            scrollAttempts.forEach(delay => {
+              setTimeout(() => {
+                window.scrollTo(0, scrollPos);
+                console.log('Scrolled at', delay, 'ms, current position:', window.scrollY);
+              }, delay);
+            });
+            
+            // Clear the flag after restoration is complete
+            setTimeout(() => {
+              sessionStorage.removeItem('returningToScanPage');
+              console.log('✅ Cleared returningToScanPage flag after restoration');
+            }, 600);
+          }
+        } else {
+          sessionStorage.removeItem('returningToScanPage');
+        }
+      } else {
+        console.log('Not returning from details - starting at top');
+      }
+    }
+  }, [loading, scans]);
+
+
+  
+  // ✅ Save scroll position on scroll
+  useEffect(() => {
+    let timeoutId: number;
+    let hasRestoredScroll = false;
+    
+    // Mark that this component is active
+    sessionStorage.setItem('activePage', 'scanDetailPage');
+    
+    // Check if we're returning from details page
+    const returningFromDetails = sessionStorage.getItem('returningToScanPage');
+    if (returningFromDetails === 'true') {
+      hasRestoredScroll = false; // Will be set to true after restoration
+      console.log('🔄 Component mounted - returning from details, will restore scroll');
+    }
+    
+    const handleScroll = () => {
+      // Debounce scroll saves
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const scrollPos = window.scrollY;
+        const activePage = sessionStorage.getItem('activePage');
+        const stillReturning = sessionStorage.getItem('returningToScanPage');
+        
+        // Don't save if:
+        // 1. This page is not active
+        // 2. We're still in the process of returning from details (within first 500ms)
+        // 3. We're loading data
+        if (activePage === 'scanDetailPage' && stillReturning !== 'true' && !loading) {
+          sessionStorage.setItem('scanDetailPage_ScrollPosition', scrollPos.toString());
+          console.log('ScanDetail Auto-saved scroll position:', scrollPos);
+        } else {
+          console.log('Skipping auto-save - returning from details or loading:', { stillReturning, loading });
+        }
+      }, 100);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('scroll', handleScroll);
+      
+      // Check BOTH flags - navigating to details OR returning from details
+      const navigatingToDetails = sessionStorage.getItem('navigatingToDetails');
+      const returningFromDetails = sessionStorage.getItem('returningToScanPage');
+      
+      console.log('Unmount - navigatingToDetails flag:', navigatingToDetails);
+      console.log('Unmount - returningToScanPage flag:', returningFromDetails);
+      
+      if (navigatingToDetails === 'true' || returningFromDetails === 'true') {
+        console.log('✅ Skipping unmount save - preserving position');
+      } else {
+        // Only save if genuinely leaving the scan detail page
+        const finalScrollPos = window.scrollY;
+        console.log('💾 Saving on unmount (leaving page):', finalScrollPos);
+        if (finalScrollPos > 0) {
+          sessionStorage.setItem('scanDetailPage_ScrollPosition', finalScrollPos.toString());
+        }
+      }
+    };
+  }, [loading]);
+
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
   const handleFilterChange = (field: keyof Filters, value: string) => {
@@ -197,6 +313,39 @@ const Scandetail = () => {
     return pages;
   };
 
+  // ✅ Handle navigation and save scroll
+  const handleViewDetails = (scan: ScanItem) => {
+    // Mark that we're navigating to details page
+    sessionStorage.setItem('navigatingToDetails', 'true');
+    sessionStorage.setItem('activePage', 'detailsPage');
+    
+    // Save current scroll position with unique key for this page
+    const currentScroll = window.scrollY;
+    sessionStorage.setItem('scanDetailPage_ScrollPosition', currentScroll.toString());
+    console.log('Saving scroll position on button click:', currentScroll);
+    
+    // Verify it was saved
+    setTimeout(() => {
+      const verification = sessionStorage.getItem('scanDetailPage_ScrollPosition');
+      console.log('Verification - position in storage:', verification);
+    }, 10);
+    
+    navigate("/ObdScanReport/details", {
+      state: {
+        ScanArray: scan.scanResArray,
+        DecodeArray: scan.decodedArray,
+        start_time: scan.scan_start_time,
+        end_time: scan.scan_end_time,
+        license_plate: scan.license_plate,
+        email: scan.email,
+        App_version: scan.app_version,
+        scan_ended: scan.scan_ended,
+        functiones: scan.function,
+        type: scan.type,
+      },
+    });
+  };
+
   return (
     <div className="p-4 ml-8">
       <h2 className="text-xl font-bold mb-4">Scan Details</h2>
@@ -207,13 +356,14 @@ const Scandetail = () => {
             onSubmit={(e) => {
               e.preventDefault();
               setPage(1);
+              sessionStorage.removeItem('scanDetailPage_ScrollPosition');
               fetchData();
             }}
           >
             <div className="flex flex-wrap gap-4">
               {Object.keys(filters).map((key) => (
                 <input
-                  key={key}
+                  key={`filter-${key}`}
                   type={
                     key.includes("time")
                       ? "date"
@@ -276,7 +426,7 @@ const Scandetail = () => {
         </thead>
         <tbody>
           {scans.map((scan) => (
-            <tr key={scan.id}>
+            <tr key={`scan-${scan.id}`}>
               <HeaderAndValue Title={scan.email} />
               <HeaderAndValue Title={new Date(scan.scan_start_time).toLocaleString()} />
               <HeaderAndValue Title={new Date(scan.scan_end_time).toLocaleString()} />
@@ -305,22 +455,7 @@ const Scandetail = () => {
               </td>
               <td className="border px-4 py-2">
                 <button
-                  onClick={() =>
-                    navigate("/ObdScanReport/details", {
-                      state: {
-                        ScanArray: scan.scanResArray,
-                        DecodeArray: scan.decodedArray,
-                        start_time: scan.scan_start_time,
-                        end_time: scan.scan_end_time,
-                        license_plate: scan.license_plate,
-                        email: scan.email,
-                        App_version: scan.app_version,
-                        scan_ended: scan.scan_ended,
-                        functiones: scan.function,
-                        type: scan.type,
-                      },
-                    })
-                  }
+                  onClick={() => handleViewDetails(scan)}
                   className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
                 >
                   View Details
@@ -344,7 +479,7 @@ const Scandetail = () => {
 
             {generatePageNumbers().map((pageNum) => (
               <button
-                key={pageNum}
+                key={`page-${pageNum}`}
                 className={`w-10 h-10 rounded-md font-medium transition-colors ${
                   page === pageNum
                     ? 'bg-blue-500 text-white'
@@ -375,3 +510,6 @@ const Scandetail = () => {
 };
 
 export default Scandetail;
+
+
+
