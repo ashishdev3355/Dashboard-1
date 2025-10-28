@@ -23,6 +23,7 @@ interface ScanResItem {
 
 interface ScanItem {
   id: number;
+  scan_id : number;
   email: string;
   model: string;
   vin: string;
@@ -330,7 +331,8 @@ const Scandetail = () => {
       console.log('Verification - position in storage:', verification);
     }, 10);
     
-    navigate("/ObdScanReport/details", {
+    navigate(`/ObdScanReport/details/${scan.id}`, {
+    // navigate(`/ObdScanReport/details`, {
       state: {
         ScanArray: scan.scanResArray,
         DecodeArray: scan.decodedArray,

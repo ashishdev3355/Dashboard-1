@@ -45,7 +45,7 @@ function App() {
           <Route path="api1" element={<Api1 />} />
           <Route path="api2" element={<Api2 />} />
           <Route path="ObdScanReport" element={<ObdScanReport />} />
-          <Route path="ObdScanReport/details" element={<ScanDetailPage />} />
+          <Route path="ObdScanReport/details/:id" element={<ScanDetailPage />} />
           <Route path="SpecilaFunction" element={<SpecilaFunction />} />
           <Route path="SpecialFunctions/details" element={<SpdetailsPage />} />
           <Route path="ActuationsDetail" element={<ActuationsDetail />} />
