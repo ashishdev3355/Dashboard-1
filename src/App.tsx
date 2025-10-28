@@ -39,8 +39,6 @@ function App() {
         {/* <Route path="/" element={<Signup />} /> */}
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Login />} />
-        {/* <Route path="/" element={<Layout />}>
-         */}
         <Route path="" element={<RequireAuth><Layout /></RequireAuth>}>
           <Route path="api1" element={<Api1 />} />
           <Route path="api2" element={<Api2 />} />

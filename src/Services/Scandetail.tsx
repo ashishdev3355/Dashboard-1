@@ -230,8 +230,9 @@ const Scandetail = () => {
   
   // ✅ Save scroll position on scroll
   useEffect(() => {
-    let timeoutId: number;
-    let hasRestoredScroll = false;
+    // let timeoutId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    // let hasRestoredScroll = false;
     
     // Mark that this component is active
     sessionStorage.setItem('activePage', 'scanDetailPage');
@@ -239,7 +240,7 @@ const Scandetail = () => {
     // Check if we're returning from details page
     const returningFromDetails = sessionStorage.getItem('returningToScanPage');
     if (returningFromDetails === 'true') {
-      hasRestoredScroll = false; // Will be set to true after restoration
+      // hasRestoredScroll = false; // Will be set to true after restoration
       console.log('🔄 Component mounted - returning from details, will restore scroll');
     }
     
