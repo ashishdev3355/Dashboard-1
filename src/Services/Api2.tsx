@@ -224,6 +224,7 @@ const CommandAPIFrontend = () => {
                   <option value="scan">Scan</option>
                   <option value="live_data">Live Data</option>
                   <option value="vin">vin</option>
+                  
                   <option value="clear">Clear Codes</option>
                 </select>
               </div>
