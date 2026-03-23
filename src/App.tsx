@@ -1,4 +1,4 @@
-import { BrowserRouter,Route,Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Api1 from "./Services/Api1";
 import Api2 from "./Services/Api2";
 import BikeMakeList from './Services/BikeMakeList.tsx'
@@ -11,13 +11,14 @@ import OdometerDetails from './Services/OdometerDetails.tsx'
 import FileUploader from './Services/Updatecommand.tsx'
 import UsersTable from "./Services/UsersTable.tsx";
 import ObdScanReport from "./Services/Scandetail.tsx";
-import ScanDetailPage from "./Compontens/ScanDetails/ScanDetailsPage.tsx"; 
-import SpdetailsPage from "./Compontens/SpecialFunctions/SpdetailsPage.tsx"; 
-import ActuationsDetailpage from "./Compontens/ActuationsDetails/ActuationsDetailpage.tsx"; 
+import ScanDetailPage from "./Compontens/ScanDetails/ScanDetailsPage.tsx";
+import SpdetailsPage from "./Compontens/SpecialFunctions/SpdetailsPage.tsx";
+import ActuationsDetailpage from "./Compontens/ActuationsDetails/ActuationsDetailpage.tsx";
 import SpecilaFunction from "./Services/SpecialFunctions.tsx";
 import ActuationsDetail from "./Services/ActuationsDetail.tsx";
-import FaultCodesUploader from "./Services/FaultCodesUploader.tsx";
+// import FaultCodesUploader from "./Services/FaultCodesUploader.tsx";
 import ActivationCodesUploader from "./Services/ActivationCodesUploader.tsx";
+import LiveDataCommandsUploader from "./Services/LiveDataCommandsUploader.tsx";
 import LiveDataCommands from "./Services/LiveDataCommands.tsx";
 import FaultCodesUploader2 from "./Services/FaultCodesUploader2.tsx";
 import FaultCodeSymptoms from "./Services/FaultCodeSymptoms.tsx";
@@ -34,6 +35,7 @@ import RequireAuth from "./RequireAuth.tsx";
 function App() {
   return (
     <BrowserRouter>
+    
       <Routes>
         {/* <Route path="/signup" element={<Signup />} /> */}
         {/* <Route path="/" element={<Signup />} /> */}
@@ -57,9 +59,10 @@ function App() {
           <Route path="LiveDataCommands" element={<LiveDataCommands />} />
           <Route path="OdometerDetails" element={<OdometerDetails />} />
           <Route path="Updatecommand" element={<FileUploader />} />
-          <Route path="FaultCodesUploader" element={<FaultCodesUploader />} />
-          <Route path="FaultCodesUploader2" element={<FaultCodesUploader2 />} />
+          {/* <Route path="FaultCodesUploader" element={<FaultCodesUploader />} /> */}
+          <Route path="FaultCodesUploader" element={<FaultCodesUploader2 />} />
           <Route path="ActivationCodesUploader" element={<ActivationCodesUploader />} />
+          <Route path="LiveDataCommandsUploader" element={<LiveDataCommandsUploader />} />
           <Route path="FaultCodeSymptoms" element={<FaultCodeSymptoms />} />
           <Route path="FaultCodeSolutions" element={<FaultCodeSolutions />} />
           <Route path="FaultCodeCauses" element={<FaultCodeCauses />} />

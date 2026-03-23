@@ -41,7 +41,7 @@ const LiveDateCommands: React.FC = () => {
         searchModel: string = "",
         searchModule: string = ""
     ) => {
-        console.log('🔍 fetchLiveData called with:', { targetPage, searchMake, searchModel, searchModule });
+        
         
         // Cancel previous request
         if (abortControllerRef.current) {

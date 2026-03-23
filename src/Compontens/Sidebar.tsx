@@ -25,8 +25,8 @@ const menuItems: MenuItem[] = [
   { label: "Fault Code List", path: "/FaultCodeList" },
   { label: "Update commands", path: "/Updatecommand" },
   { label: "Fault Codes Uploader", path: "/FaultCodesUploader" },
-  { label: "Fault Codes Uploader 2", path: "/FaultCodesUploader2" },
   { label: "Activation Codes Uploader", path: "/ActivationCodesUploader" },
+  { label: "Live Data Commands Uploader", path: "/LiveDataCommandsUploader" },
 ];
 
 function Sidebar() {
@@ -40,10 +40,9 @@ function Sidebar() {
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              `block px-4 py-2 rounded-lg text-lg font-medium transition-all duration-200 ${
-                isActive
-                  ? "bg-blue-500 text-white shadow"
-                  : "text-gray-700 hover:bg-blue-100"
+              `block px-4 py-2 rounded-lg text-lg font-medium transition-all duration-200 ${isActive
+                ? "bg-blue-500 text-white shadow"
+                : "text-gray-700 hover:bg-blue-100"
               }`
             }
           >
