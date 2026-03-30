@@ -6,6 +6,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  { label: "Role Management", path: "/AdminUsers" },
   { label: "Users Table", path: "/UsersTable" },
   { label: "Covarage Data", path: "/Api1" },
   { label: "Mechanic Commands", path: "/Api2" },
@@ -30,12 +31,15 @@ const menuItems: MenuItem[] = [
 ];
 
 function Sidebar() {
+  const role_id = localStorage.getItem("role_id");
+  const filteredMenuItems = menuItems.filter(item => item.path !== "/AdminUsers" || role_id === "1");
+
   return (
     <div className="bg-gray-100 h-screen w-64 p-4 shadow-lg overflow-y-auto">
       <h2 className="text-2xl font-bold mb-6 ml-4 text-gray-800 ">DashBoard</h2>
 
       <div className="space-y-4">
-        {menuItems.map((item) => (
+        {filteredMenuItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

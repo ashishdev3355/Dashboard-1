@@ -11,9 +11,19 @@ const Login: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res: AuthResponse = await login(email, password);
+    const cleanEmail = email.trim();
+    const res: AuthResponse = await login(cleanEmail, password);
     if (res.token) {
-      navigate("/UsersTable"); // redirect after login
+      if (res.user && res.user.role_id) {
+        localStorage.setItem("role_id", res.user.role_id);
+      }
+      if (res.user && res.user.must_change_password) {
+        localStorage.setItem("must_change_password", "true");
+        navigate("/change-password");
+      } else {
+        localStorage.setItem("must_change_password", "false");
+        navigate("/UsersTable"); // redirect after login
+      }
     } else {
       setMessage(res.error || "Login failed");
     }

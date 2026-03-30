@@ -10,6 +10,7 @@ import CommandFetcher from './Services/CommandFetcher .tsx'
 import OdometerDetails from './Services/OdometerDetails.tsx'
 import FileUploader from './Services/Updatecommand.tsx'
 import UsersTable from "./Services/UsersTable.tsx";
+import AdminUsersTable from "./Services/AdminUsersTable.tsx";
 import ObdScanReport from "./Services/Scandetail.tsx";
 import ScanDetailPage from "./Compontens/ScanDetails/ScanDetailsPage.tsx";
 import SpdetailsPage from "./Compontens/SpecialFunctions/SpdetailsPage.tsx";
@@ -27,10 +28,8 @@ import FaultCodeCauses from "./Services/FaultCodeCauses.tsx";
 import FaultCodeList from "./Services/FaultCodeList.tsx";
 // import Signup from "./pages/Signup.tsx";
 import Login from "./pages/Login.tsx";
+import ChangePassword from "./pages/ChangePassword.tsx";
 import RequireAuth from "./RequireAuth.tsx";
-
-
-
 
 function App() {
   return (
@@ -40,6 +39,7 @@ function App() {
         {/* <Route path="/signup" element={<Signup />} /> */}
         {/* <Route path="/" element={<Signup />} /> */}
         <Route path="/login" element={<Login />} />
+        <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/" element={<Login />} />
         <Route path="" element={<RequireAuth><Layout /></RequireAuth>}>
           <Route path="api1" element={<Api1 />} />
@@ -52,6 +52,7 @@ function App() {
           <Route path="ActuationsDetail/details" element={<ActuationsDetailpage />} />
           <Route path="BikeMakeList" element={<BikeMakeList />} />
           <Route path="UsersTable" element={<UsersTable />} />
+          <Route path="AdminUsers" element={<AdminUsersTable />} />
           <Route path="CommandFetcher" element={<CommandFetcher />} />
           <Route path="Customcommands1" element={<Customcommands1 />} />
           <Route path="ActuationFetcher" element={<ActuationFetcher />} />
