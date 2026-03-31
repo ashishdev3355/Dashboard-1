@@ -7,7 +7,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 export interface User {
   id: number;
   email: string;
-  role: string;
+  role?: string;
+  role_id?: string;
+  must_change_password?: boolean;
 }
 
 export interface AuthResponse {
@@ -47,6 +49,9 @@ export async function login(email: string, password: string): Promise<AuthRespon
   const data: AuthResponse = await res.json();
   if (res.ok && data.token) {
     localStorage.setItem("token", data.token);
+    if (data.user && data.user.role_id) {
+       localStorage.setItem("role_id", String(data.user.role_id));
+    }
   }
   return data;
 }
@@ -56,6 +61,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
 // -------------------------
 export function logout(): void {
   localStorage.removeItem("token");
+  localStorage.removeItem("role_id");
 }
 
 // -------------------------

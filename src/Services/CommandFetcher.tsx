@@ -1,14 +1,16 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { 
-  Zap, 
+  Layers, 
+  Search, 
   Database, 
+  Info, 
   Car, 
   Calendar,
+  ChevronRight,
   ShieldAlert,
-  Terminal,
-  Cpu,
-  Layers,
-  Code
+  Code,
+  Zap,
+  Terminal
 } from 'lucide-react';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -16,23 +18,28 @@ import Input from '../components/Input';
 import PageHeader from '../components/PageHeader';
 import Badge from '../components/Badge';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-interface CommandData {
+type Detail = {
+  pid: string;
+  command_type: string;
   function_name: string;
-  make: string;
-  model: string;
-  variant: string[];
-  commands: Record<string, string[]>;
-}
+  message: string | null;
+  hard_coded: boolean;
+};
 
-const ITEMS_PER_PAGE = 100;
+type SPFCommand = {
+  function_name: string;
+  hard_coded: boolean;
+  details: Detail[];
+};
 
-const CustomCommands: React.FC = () => {
-  const [data, setData] = useState<CommandData[]>([]);
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const ITEMS_PER_PAGE = 200;
+
+const SPFCommands: React.FC = () => {
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
+  const [data, setData] = useState<SPFCommand[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
@@ -40,13 +47,14 @@ const CustomCommands: React.FC = () => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const fetchCustomCommands = useCallback(async (pageNumber = 1, currentMake?: string, currentModel?: string, currentYear?: string) => {
+  const fetchData = useCallback(async (targetPage?: number, currentMake?: string, currentModel?: string, currentYear?: string) => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
 
     setLoading(true);
     setError("");
 
+    const currentPage = targetPage ?? page;
     const searchMake = currentMake !== undefined ? currentMake : make;
     const searchModel = currentModel !== undefined ? currentModel : model;
     const searchYear = currentYear !== undefined ? currentYear : year;
@@ -56,11 +64,11 @@ const CustomCommands: React.FC = () => {
       if (searchMake.trim()) params.append("make", searchMake);
       if (searchModel.trim()) params.append("model", searchModel);
       if (searchYear.trim()) params.append("year", searchYear);
-      params.append("page", pageNumber.toString());
+      params.append("page", currentPage.toString());
       params.append("limit", ITEMS_PER_PAGE.toString());
 
-      const url = `${API_BASE_URL}api/CustomCommands?${params.toString()}`;
       const token = localStorage.getItem("token");
+      const url = `${BASE_URL}api/SPFCommands?${params.toString()}`;
       
       const response = await fetch(url, {
         signal: abortControllerRef.current.signal,
@@ -70,38 +78,29 @@ const CustomCommands: React.FC = () => {
         },
       });
 
-      if (!response.ok) throw new Error(`Connectivity failure: ${response.status}`);
-
+      if (!response.ok) throw new Error(`Fetch aborted or failed: ${response.status}`);
+      
       const json = await response.json();
 
-      if (json.data && Array.isArray(json.data)) {
-        const normalizedData: CommandData[] = json.data.map((item: any) => ({
-          function_name: item.function_name,
-          make: item.make,
-          model: item.model,
-          variant: item.variant || [],
-          commands: item.commands?.[0] || {},
-        }));
-
-        setData(normalizedData);
+      if (json.data && json.data.length > 0) {
+        setData(json.data);
         setTotal(json.total || 0);
-        setPage(pageNumber);
       } else {
         setData([]);
+        setError(searchMake || searchModel || searchYear ? "No SPF sequences found matching vehicle description." : "SPF command repository is currently empty.");
         setTotal(0);
-        setError(searchMake || searchModel || searchYear ? "Criteria returned zero protocol matches." : "Custom command repository is currently empty.");
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      setError("Failed to synchronize with custom protocol server.");
+      setError("Failed to synchronize with SPF telemetry server.");
     } finally {
       setLoading(false);
       abortControllerRef.current = null;
     }
-  }, [make, model, year]);
+  }, [make, model, year, page]);
 
   useEffect(() => {
-    fetchCustomCommands(1);
+    fetchData(1);
     return () => {
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
@@ -109,37 +108,36 @@ const CustomCommands: React.FC = () => {
 
   const handleSearch = () => {
     setPage(1);
-    fetchCustomCommands(1, make, model, year);
+    fetchData(1, make, model, year);
   };
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    fetchCustomCommands(newPage, make, model, year);
+    fetchData(newPage, make, model, year);
+  };
+
+  const getPageNumbers = () => {
+    const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+    const pages = [];
+    const maxPagesToShow = 5;
+    let start = Math.max(1, page - Math.floor(maxPagesToShow / 2));
+    let end = Math.min(totalPages, start + maxPagesToShow - 1);
+    if (end - start < maxPagesToShow - 1) start = Math.max(1, end - maxPagesToShow + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
   };
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
-  const generatePageNumbers = () => {
-    const pages = [];
-    const maxVisiblePages = 5;
-    let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
-    return pages;
-  };
-
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-12 px-2">
       <PageHeader 
-        title="Custom Command Registry" 
-        subtitle="Manage and analyze bespoke vehicle diagnostic sequences and command sets."
+        title="SPF Command Engine" 
+        subtitle="Manage and analyze Special Function (SPF) protocols and PID mappings."
         icon={Terminal}
       />
 
-      <Card title="Protocol Filter" subtitle="Find sequences by vehicle specifications" icon={Layers}>
+      <Card title="Registry Query" subtitle="Filter sequences by vehicle manufacturer and series" icon={Layers}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -150,21 +148,21 @@ const CustomCommands: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Input 
               label="Manufacturer" 
-              placeholder="e.g. BMW, Audi"
+              placeholder="e.g. Hyundai, Toyota"
               value={make}
               onChange={(e) => setMake(e.target.value)}
               icon={Database}
             />
             <Input 
               label="Model Specification" 
-              placeholder="e.g. X5, A6"
+              placeholder="e.g. i20, Corolla"
               value={model}
               onChange={(e) => setModel(e.target.value)}
               icon={Car}
             />
             <Input 
               label="Production Year" 
-              placeholder="e.g. 2022"
+              placeholder="e.g. 2020"
               value={year}
               onChange={(e) => setYear(e.target.value)}
               icon={Calendar}
@@ -182,79 +180,78 @@ const CustomCommands: React.FC = () => {
         {loading ? (
           <div className="p-32 text-center">
             <div className="animate-spin h-14 w-14 border-[5px] border-primary-600 border-t-transparent rounded-full mx-auto mb-8 shadow-inner shadow-primary-50"></div>
-            <p className="text-slate-400 font-black tracking-[0.2em] animate-pulse">SYNCHRONIZING CUSTOM PROTOCOLS...</p>
+            <p className="text-slate-400 font-black tracking-[0.2em] animate-pulse uppercase">Syncing SPF Telemetry...</p>
           </div>
         ) : error ? (
           <div className="p-24 text-center bg-white rounded-[32px] border border-slate-100 shadow-xl">
             <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
               <ShieldAlert className="w-10 h-10 text-red-500" />
             </div>
-            <h3 className="text-xl font-black text-slate-800 mb-2">Sync Interrupted</h3>
+            <h3 className="text-xl font-black text-slate-800 mb-2">Sync Error</h3>
             <p className="text-slate-500 font-bold italic mb-8 mx-auto max-w-xs">{error}</p>
-            <Button variant="outline" onClick={() => fetchCustomCommands(1)}>Resume Sync</Button>
+            <Button variant="outline" onClick={() => fetchData(1)}>Resume Sync</Button>
           </div>
         ) : data.length > 0 ? (
           data.map((item, idx) => (
             <Card 
               key={idx} 
               title={item.function_name} 
-              subtitle={`${item.make} ${item.model}`}
-              icon={Zap}
+              headerAction={
+                <Badge variant={item.hard_coded ? "warning" : "secondary"}>
+                  {item.hard_coded ? "Hard Coded" : "Dynamic"}
+                </Badge>
+              }
+              icon={Code}
               noPadding
             >
-              <div className="p-6 space-y-6">
-                <div className="flex flex-wrap gap-2">
-                  {item.variant.map((v, i) => (
-                    <Badge key={i} variant="secondary" className="bg-slate-50 text-slate-500 border-slate-200">
-                      Variant: {v}
-                    </Badge>
-                  ))}
+              {item.details && item.details.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px] text-left">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="px-5 py-4 font-black text-slate-400 uppercase tracking-widest">PID Hook</th>
+                        <th className="px-5 py-4 font-black text-slate-400 uppercase tracking-widest">Command Type</th>
+                        <th className="px-5 py-4 font-black text-slate-400 uppercase tracking-widest">Protocol Message</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {item.details.map((d, detailIdx) => (
+                        <tr key={detailIdx} className="hover:bg-primary-50/20 transition-colors">
+                          <td className="px-5 py-4">
+                            <code className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg font-black">{d.pid ?? "0x00"}</code>
+                          </td>
+                          <td className="px-5 py-4 font-bold text-slate-600 italic">{d.command_type ?? "N/A"}</td>
+                          <td className="px-5 py-4 text-slate-500 font-medium italic">{d.message ?? "Protocol initialized."}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Code className="w-4 h-4" />
-                    Command Sequences
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(item.commands).map(([variant, cmds]) => (
-                      <div key={variant} className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">{variant}</span>
-                          <Badge variant="primary">{cmds.length} Steps</Badge>
-                        </div>
-                        <div className="space-y-1">
-                          {cmds.map((cmd, i) => (
-                            <div key={i} className="flex gap-2 text-[11px]">
-                              <span className="text-slate-300 font-black w-4">{i + 1}.</span>
-                              <code className="text-slate-600 font-mono break-all">{cmd}</code>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              ) : (
+                <div className="p-12 text-center">
+                  <Info className="w-10 h-10 text-slate-200 mx-auto mb-4" />
+                  <p className="text-slate-400 font-bold italic text-sm tracking-wide">No low-level PID details mapped for this function.</p>
                 </div>
-              </div>
+              )}
             </Card>
           ))
         ) : (
           <div className="p-32 text-center">
-            <Cpu className="w-16 h-16 text-slate-100 mx-auto mb-6" />
-            <p className="text-slate-400 font-bold uppercase tracking-[0.2em] italic">No Protocols Found</p>
+            <Zap className="w-16 h-16 text-slate-100 mx-auto mb-6" />
+            <p className="text-slate-400 font-bold uppercase tracking-[0.2em] italic">No SPF Data Sync</p>
           </div>
         )}
       </div>
 
       {totalPages > 1 && (
         <div className="flex flex-col md:flex-row items-center justify-between p-6 bg-white rounded-[32px] border border-slate-100 shadow-xl gap-4">
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">
-            Sequence Page <span className="text-primary-600">{page}</span> of <span className="text-slate-800">{totalPages}</span>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+            Registry Page <span className="text-primary-600 font-black">{page}</span> of <span className="text-slate-800 font-black">{totalPages}</span>
           </p>
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => handlePageChange(Math.max(1, page - 1))} disabled={page === 1 || loading}>Previous</Button>
             <div className="hidden sm:flex gap-1">
-              {generatePageNumbers().map((pageNum) => (
+              {getPageNumbers().map((pageNum) => (
                 <button
                   key={pageNum}
                   onClick={() => handlePageChange(pageNum)}
@@ -282,4 +279,4 @@ const CustomCommands: React.FC = () => {
   );
 };
 
-export default CustomCommands;
+export default SPFCommands;

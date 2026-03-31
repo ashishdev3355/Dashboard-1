@@ -1,6 +1,22 @@
-
 import React, { useState, useRef } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Bug, TrendingUp } from 'lucide-react';
+import { 
+  Upload, 
+  FileSpreadsheet, 
+  CheckCircle, 
+  AlertCircle, 
+  Bug, 
+  TrendingUp,
+  ShieldCheck,
+  FileUp,
+  Activity,
+  History,
+  Info,
+  Trash2,
+  ChevronRight
+} from 'lucide-react';
+import Card from '../components/Card';
+import Button from '../components/Button';
+import PageHeader from '../components/PageHeader';
 
 interface UploadResponse {
   message: string;
@@ -39,7 +55,7 @@ const FaultCodesUploader2: React.FC = () => {
       setMessage('');
       setStats(null);
     } else {
-      setMessage('Please select a valid Excel file (.xlsx or .xls)');
+      setMessage('Invalid protocol. Please select an Excel manifest (.xlsx or .xls)');
       setUploadStatus('error');
     }
   };
@@ -76,7 +92,7 @@ const FaultCodesUploader2: React.FC = () => {
 
   const handleUpload = async () => {
     if (!file) {
-      setMessage('Please select a file first');
+      setMessage('No diagnostic manifest identified for ingestion');
       setUploadStatus('error');
       return;
     }
@@ -102,7 +118,7 @@ const FaultCodesUploader2: React.FC = () => {
 
       if (response.ok) {
         setUploadStatus('success');
-        setMessage(data.message || 'Excel file uploaded successfully!');
+        setMessage(data.message || 'Diagnostic database synchronized successfully');
         setStats(data.stats || null);
         setFile(null);
         if (fileInputRef.current) {
@@ -110,23 +126,21 @@ const FaultCodesUploader2: React.FC = () => {
         }
       } else {
         setUploadStatus('error');
-        setMessage(data.message || 'Upload failed');
+        setMessage(data.message || 'Synchronization failure');
       }
     } catch (error) {
       setUploadStatus('error');
-      setMessage('Network error. Please try again.');
-      console.error('Upload error:', error);
+      setMessage('Transmission error during database update cycle');
     } finally {
       setIsUploading(false);
     }
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + ['B', 'KB', 'MB'][i];
   };
 
   const formatTime = (ms: number): string => {
@@ -135,47 +149,149 @@ const FaultCodesUploader2: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-lg p-6 mb-6 text-white">
-        <div className="flex items-center gap-3 mb-2">
-          <Bug className="w-8 h-8" />
-          <h1 className="text-2xl font-bold">Fault Codes Excel Importer</h1>
+    <div className="max-w-6xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
+      <PageHeader 
+        title="DTC Registry Ingestion" 
+        subtitle="Upload and correlate global diagnostic fault codes with repair intelligence"
+        icon={Bug}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <Card title="Database Manifest Upload" icon={FileUp}>
+            <div
+              className={`relative border-2 border-dashed rounded-[32px] p-12 text-center transition-all duration-300 ${
+                isDragOver 
+                  ? 'border-primary-400 bg-primary-50/50' 
+                  : file 
+                  ? 'border-emerald-300 bg-emerald-50/20'
+                  : 'border-slate-200 bg-slate-50/50 hover:border-primary-300 hover:bg-white'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <div className="flex flex-col items-center gap-6">
+                {file ? (
+                  <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center animate-bounce-slow">
+                    <FileSpreadsheet className="w-10 h-10 text-emerald-600" />
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 bg-primary-50 rounded-3xl flex items-center justify-center">
+                    <Upload className="w-10 h-10 text-primary-500" />
+                  </div>
+                )}
+                
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 mb-2">
+                    {file ? file.name : "Drop DTC manifest or browse"}
+                  </h3>
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+                    {file ? formatFileSize(file.size) : "Protocol: .xlsx, .xls (Max 50MB)"}
+                  </p>
+                </div>
+                
+                {!file ? (
+                  <Button variant="secondary" onClick={handleBrowseClick} icon={Activity}>
+                    Browse Registry
+                  </Button>
+                ) : (
+                  <div className="flex gap-4">
+                    <Button variant="primary" onClick={handleUpload} isLoading={isUploading} icon={ShieldCheck}>
+                      Initiate Import
+                    </Button>
+                    <Button variant="secondary" onClick={() => setFile(null)} icon={Trash2}>
+                      Purge
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {stats && uploadStatus === 'success' && (
+            <Card title="Synchronization Intelligence" icon={TrendingUp} subtitle="DTC Ingestion Metrics">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100">
+                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">New Entrants</p>
+                  <div className="text-3xl font-black text-emerald-700">{stats.insertedCount}</div>
+                  <p className="text-xs text-emerald-500 mt-1 font-bold italic">Records defined</p>
+                </div>
+                <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100">
+                  <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Redundancy Filter</p>
+                  <div className="text-3xl font-black text-amber-700">{stats.skippedCount}</div>
+                  <p className="text-xs text-amber-500 mt-1 font-bold italic">Duplicates bypassed</p>
+                </div>
+                <div className="bg-primary-50 p-6 rounded-2xl border border-primary-100">
+                  <p className="text-[10px] font-black text-primary-600 uppercase tracking-widest mb-1">Total Throughput</p>
+                  <div className="text-3xl font-black text-primary-700">{stats.totalRowsProcessed}</div>
+                  <p className="text-xs text-primary-500 mt-1 font-bold italic">Rows synchronized</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <span className="text-xs font-bold text-slate-400 uppercase">Process Velocity</span>
+                  <span className="text-sm font-black text-slate-700">{stats.rowsPerSecond} records/sec</span>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <span className="text-xs font-bold text-slate-400 uppercase">Latency</span>
+                  <span className="text-sm font-black text-slate-700">{formatTime(stats.processingTimeMs)}</span>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {message && (
+            <div className={`p-6 rounded-[24px] border flex items-center gap-4 animate-fadeIn ${
+              uploadStatus === 'success' 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-100' 
+                : 'bg-rose-50 text-rose-800 border-rose-100'
+            }`}>
+              {uploadStatus === 'success' ? (
+                <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-6 h-6 text-rose-600 shrink-0" />
+              )}
+              <span className="font-bold italic">{message}</span>
+            </div>
+          )}
         </div>
-        <p className="text-red-100">Import Excel files containing DTC codes, titles, severity levels, and repair difficulty data</p>
+
+        <div className="lg:col-span-1 space-y-8">
+          <Card title="Protocol Definition" icon={Info}>
+            <div className="space-y-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Expected Manifest Schema:</p>
+              <div className="space-y-2">
+                {[
+                  { label: 'DTC', desc: 'Diagnostic Code Identifier' },
+                  { label: 'Title', desc: 'Fault Description' },
+                  { label: 'Severity', desc: 'Priority Index (1-5)' },
+                  { label: 'Difficulty', desc: 'Repair Complexity' },
+                  { label: 'Make', desc: 'Target Manufacturer' },
+                  { label: 'Generic', desc: 'Global Protocol Flag' }
+                ].map(item => (
+                  <div key={item.label} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <ChevronRight size={12} className="text-primary-500" />
+                      <span className="text-[10px] font-black text-slate-600 uppercase">{item.label}</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 italic">{item.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Transmission History" icon={History}>
+             <div className="text-center py-8">
+                <History className="w-8 h-8 text-slate-200 mx-auto mb-3" />
+                <p className="text-[11px] font-bold text-slate-400 italic px-4">Session logs are synchronized automatically with the global telemetry cluster.</p>
+             </div>
+          </Card>
+        </div>
       </div>
 
-      {/* File Upload Area */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
-          isDragOver 
-            ? 'border-red-400 bg-red-50' 
-            : 'border-gray-300 hover:border-red-400 hover:bg-gray-50'
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <div className="flex flex-col items-center gap-4">
-          <Upload className="w-16 h-16 text-gray-400" />
-          <div>
-            <h3 className="text-lg font-medium text-gray-700 mb-2">
-              Drop your Excel file here or click to browse
-            </h3>
-            <p className="text-sm text-gray-500">
-              Supports .xlsx and .xls files up to 50MB
-            </p>
-          </div>
-          <button
-            onClick={handleBrowseClick}
-            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Browse Files
-          </button>
-        </div>
-      </div>
-
-      {/* Hidden File Input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -183,121 +299,6 @@ const FaultCodesUploader2: React.FC = () => {
         onChange={handleFileInputChange}
         className="hidden"
       />
-
-      {/* Selected File Display */}
-      {file && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-          <div className="flex items-center gap-3">
-            <FileSpreadsheet className="w-6 h-6 text-green-600" />
-            <div className="flex-1">
-              <p className="font-medium text-gray-900">{file.name}</p>
-              <p className="text-sm text-gray-500">{formatFileSize(file.size)}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Expected File Format */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h4 className="font-medium text-gray-900 mb-3">Expected Excel Format:</h4>
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <span className="text-sm font-medium">DTC</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span className="text-sm font-medium">Title</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <span className="text-sm font-medium">Severity</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-sm font-medium">Repair Difficulty</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-            <span className="text-sm font-medium">Make</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-indigo-500 rounded-full"></div>
-            <span className="text-sm font-medium">Generic</span>
-          </div>
-        </div>
-        <div className="space-y-2 text-sm text-blue-700">
-          <p>• Column A: DTC code (required)</p>
-          <p>• Column B: Error title/description</p>
-          <p>• Column C: Severity level (1-5)</p>
-          <p>• Column D: Repair difficulty (1-5)</p>
-          <p>• Column E: Vehicle make</p>
-          <p>• Column F: Company ID (extracted from Excel data)</p>
-          <p>• Column G: Generic flag (true/false)</p>
-        </div>
-      </div>
-
-      {/* Upload Statistics */}
-      {stats && uploadStatus === 'success' && (
-        <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-          <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            Import Statistics
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-3 rounded border">
-              <div className="text-2xl font-bold text-green-600">{stats.insertedCount}</div>
-              <div className="text-sm text-gray-600">New Records Added</div>
-            </div>
-            <div className="bg-white p-3 rounded border">
-              <div className="text-2xl font-bold text-yellow-600">{stats.skippedCount}</div>
-              <div className="text-sm text-gray-600">Duplicates Skipped</div>
-            </div>
-            <div className="bg-white p-3 rounded border">
-              <div className="text-2xl font-bold text-blue-600">{stats.totalRowsProcessed}</div>
-              <div className="text-sm text-gray-600">Total Rows Processed</div>
-            </div>
-          </div>
-          <div className="mt-3 text-sm text-gray-600 space-y-1">
-            <p><strong>Processing Time:</strong> {formatTime(stats.processingTimeMs)}</p>
-            <p><strong>Speed:</strong> {stats.rowsPerSecond} rows/second</p>
-            <p><strong>Worksheet:</strong> {stats.worksheetName}</p>
-            <p><strong>Company ID:</strong> {stats.companyId}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Status Message */}
-      {message && (
-        <div className={`mt-4 p-4 rounded-lg flex items-center gap-2 ${
-          uploadStatus === 'success' 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
-            : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          {uploadStatus === 'success' ? (
-            <CheckCircle className="w-5 h-5 text-green-600" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-red-600" />
-          )}
-          <span>{message}</span>
-        </div>
-      )}
-
-      {/* Upload Button */}
-      <div className="mt-6 flex justify-center">
-        <button
-          onClick={handleUpload}
-          disabled={!file || isUploading}
-          className={`px-8 py-3 rounded-lg font-medium flex items-center gap-2 transition-all duration-200 ${
-            !file || isUploading
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-red-600 text-white hover:bg-red-700 hover:shadow-lg transform hover:scale-105'
-          }`}
-        >
-          <Upload className="w-5 h-5" />
-          {isUploading ? 'Processing Excel...' : 'Import Fault Codes'}
-        </button>
-      </div>
     </div>
   );
 };
