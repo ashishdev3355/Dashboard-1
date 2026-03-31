@@ -1,5 +1,21 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { 
+  ShieldCheck, 
+  Search, 
+  Download, 
+  ChevronLeft, 
+  ChevronRight,
+  ClipboardList,
+  Activity,
+  Layers,
+  Filter
+} from 'lucide-react';
+import Card from '../components/Card';
+import Button from '../components/Button';
+import Input from '../components/Input';
+import PageHeader from '../components/PageHeader';
+import Badge from '../components/Badge';
 
 interface CoverageItem {
   function_name: string;
@@ -20,6 +36,7 @@ const GetCoverage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const params = new URLSearchParams({
         page: page.toString(),
         limit: ITEMS_PER_PAGE.toString(),
@@ -27,9 +44,9 @@ const GetCoverage = () => {
       });
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE_URL}api/getCoverage?${params.toString()}`,{
-         headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ attach token
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
@@ -40,50 +57,34 @@ const GetCoverage = () => {
         setCoverages(json.coverages);
         setTotal(json.total || 0);
       } else {
-        setError('Invalid response format');
+        setError('Invalid response format encountered.');
       }
     } catch (err) {
-      console.error('Fetch error:', err);
-      setError('Something went wrong');
+      setError('Connection to coverage registry failed.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Excel download function
   const downloadExcel = async () => {
     try {
       setLoading(true);
-      
-      // Fetch all data without pagination
       const params = new URLSearchParams({
         ...(make ? { make } : {}),
       });
-      
-      // Don't add page and limit to get all data
       const response = await fetch(`${API_BASE_URL}api/getCoverage?${params.toString()}`);
-      
       if (!response.ok) throw new Error('Failed to fetch coverage data');
-      
       const json = await response.json();
       
       if (json && Array.isArray(json.coverages) && json.coverages.length > 0) {
-        // Create workbook and worksheet
         const ws = XLSX.utils.json_to_sheet(json.coverages);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Coverage Data');
-        
-        // Generate filename
-        const filename = `Coverage_Data_${make || 'All'}_${new Date().toISOString().split('T')[0]}.xlsx`;
-        
-        // Download file
+        const filename = `Coverage_Manifest_${make || 'Global'}_${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(wb, filename);
-      } else {
-        alert('No data available to download');
       }
     } catch (err) {
-      console.error('Error downloading Excel:', err);
-      alert('Failed to download Excel file');
+      alert('Failed to generate export manifest');
     } finally {
       setLoading(false);
     }
@@ -95,162 +96,151 @@ const GetCoverage = () => {
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
-  const handleSearch = () => {
+  const handleSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setPage(1);
     fetchData();
   };
 
-  // Generate page numbers to show
   const generatePageNumbers = () => {
     const pages = [];
     const maxVisiblePages = 5;
-    
     let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2));
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    
-    // Adjust start page if we're near the end
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-    
+    for (let i = startPage; i <= endPage; i++) pages.push(i);
     return pages;
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-white shadow-md rounded-lg mt-6">
-      <h2 className="text-2xl font-bold mb-4">Coverage Data</h2>
-
-      {/* Filter and Buttons */}
-      <div className="flex flex-col gap-4 mb-6">
-        {/* Filter row */}
-        {/* <div className="flex gap-4">
-          <input
-            type="text"
-            placeholder="Enter car make (e.g. Hyundai)"
-            value={make}
-            onChange={(e) => setMake(e.target.value)}
-            className="border border-gray-300 px-4 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleSearch}
-            className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition"
-          >
-            Search
-          </button>
-        </div> */}
-
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault(); // stop page reload
-            handleSearch();     // call your search
-          }}
-          className="flex gap-4"
-        >
-          <input
-            type="text"
-            placeholder="Enter car make (e.g. Hyundai)"
-            value={make}
-            onChange={(e) => setMake(e.target.value)}
-            className="border border-gray-300 px-4 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition"
-          >
-            Search
-          </button>
-        </form>
-
-        
-        {/* Excel Download Button */}
-        <div className="flex justify-end">
-          <button
+    <div className="max-w-6xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
+      <PageHeader 
+        title="Protocol Coverage Index" 
+        subtitle="Global audit of supported diagnostic functions and system coverage matrices"
+        icon={ShieldCheck}
+        action={
+          <Button
+            variant="outline"
             onClick={downloadExcel}
             disabled={loading || coverages.length === 0}
-            className="bg-blue-300 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition flex items-center gap-2">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M3 17a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zM3.293 7.707A1 1 0 014 7h3V3a1 1 0 011-1h4a1 1 0 011 1v4h3a1 1 0 01.707 1.707l-7 7a1 1 0 01-1.414 0l-7-7z"/>
-            </svg>
-            Download Excel
-          </button>
-        </div>
-      </div>
+            icon={Download}
+          >
+            Export Excel
+          </Button>
+        }
+      />
 
-      {error && <p className="text-red-500">{error}</p>}
-      {loading && <p className="text-blue-500">Loading...</p>}
+      <div className="space-y-8">
+        <Card title="Manufacturer Query" icon={Search} subtitle="Search supported diagnostic hooks by brand">
+          <form onSubmit={handleSearch} className="flex flex-col md:flex-row items-end gap-6">
+            <div className="flex-1 w-full">
+              <Input
+                label="Vehicle Manufacturer"
+                placeholder="e.g. Hyundai, Toyota"
+                value={make}
+                onChange={(e) => setMake(e.target.value)}
+                icon={Layers}
+              />
+            </div>
+            <Button variant="primary" className="h-11 px-8" type="submit" isLoading={loading} icon={Activity}>
+              Scan Registry
+            </Button>
+          </form>
+        </Card>
 
-      {/* Table */}
-      {coverages.length > 0 && (
-        <>
-          <p className="mb-4 text-gray-600">
-            Showing <strong>{coverages.length}</strong> out of <strong>{total}</strong> results
-          </p>
-          <table className="min-w-full bg-white border border-gray-200 text-sm">
-            <thead>
-              <tr className="bg-gray-100 text-gray-700">
-                <th className="border px-4 py-3 text-left">Function Name</th>
-                <th className="border px-4 py-3 text-left">Function Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {coverages.map((item, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="border px-4 py-2">{item.function_name}</td>
-                  <td className="border px-4 py-2">{item.function_type}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-
-      {/* ✅ New Pagination Design */}
-      {totalPages > 1 && (
-        <div className="mt-6 flex flex-col items-center space-y-4">
-          {/* Pagination buttons */}
-          <div className="flex items-center space-x-1">
-            <button
-              className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={page === 1}
-            >
-              Previous
-            </button>
-
-            {generatePageNumbers().map((pageNum) => (
-              <button
-                key={pageNum}
-                className={`w-10 h-10 rounded-md font-medium transition-colors ${
-                  page === pageNum
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-                onClick={() => setPage(pageNum)}
-              >
-                {pageNum}
-              </button>
-            ))}
-
-            <button
-              className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-              disabled={page === totalPages}
-            >
-              Next
-            </button>
+        {loading ? (
+          <div className="bg-white rounded-[32px] border border-slate-100 p-32 text-center shadow-sm">
+            <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+            <p className="text-slate-400 font-black italic tracking-widest animate-pulse uppercase">Synchronizing Coverage Stacks...</p>
           </div>
+        ) : coverages.length > 0 ? (
+          <Card 
+            title="Verified Protocol Support" 
+            icon={ClipboardList} 
+            noPadding 
+            headerAction={<Badge variant="secondary">{total} Active Identifiers</Badge>}
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-8 py-5 font-black text-slate-400 uppercase tracking-widest">Function Name</th>
+                    <th className="px-8 py-5 font-black text-slate-400 uppercase tracking-widest text-center">Diagnostic Payload Type</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {coverages.map((item, index) => (
+                    <tr key={index} className="hover:bg-primary-50/30 transition-colors group">
+                      <td className="px-8 py-5 font-black text-slate-700 tracking-tight">{item.function_name}</td>
+                      <td className="px-8 py-5 text-center">
+                        <Badge variant={item.function_type.toLowerCase().includes('critical') ? 'danger' : 'primary'}>
+                          {item.function_type.toUpperCase()}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          {/* Showing results text */}
-          <p className="text-gray-600 text-sm">
-            Showing page {page} of {totalPages || 1} ({total} total items)
-          </p>
-        </div>
-      )}
+            {totalPages > 1 && (
+              <div className="p-6 bg-slate-50/30 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Manifest Page <span className="text-primary-600 font-black">{page}</span> of <span className="text-slate-900 font-black">{totalPages}</span>
+                </p>
+                
+                <div className="flex items-center gap-1.5">
+                  <button
+                    className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
+                    onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={page === 1}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+
+                  <div className="flex gap-2 mx-4">
+                    {generatePageNumbers().map((pageNum) => (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPage(pageNum)}
+                        className={`w-9 h-9 rounded-xl text-[11px] font-black transition-all ${
+                          page === pageNum
+                            ? "bg-primary-600 text-white shadow-lg shadow-primary-200"
+                            : "bg-white text-slate-500 border border-slate-100 hover:bg-primary-50"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
+                    onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={page === totalPages}
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </Card>
+        ) : (
+          <div className="bg-slate-50/50 rounded-[32px] border border-dashed border-slate-200 p-24 text-center">
+            <Filter size={48} className="mx-auto text-slate-200 mb-4" />
+            <p className="text-slate-400 font-bold italic">No coverage data identified for "{make || 'selected parameters'}"</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-rose-50 border border-rose-100 rounded-[20px] p-5 flex items-center gap-4 text-rose-600 font-bold text-sm animate-shake">
+            <Activity size={20} className="animate-pulse" />
+            <span>{error}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

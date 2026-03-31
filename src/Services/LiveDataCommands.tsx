@@ -1,23 +1,40 @@
 import React, { useEffect, useState, useRef } from "react";
-import TableHead from "../ReusedCompontets/TableHead"
+import { 
+  Zap, 
+  Search, 
+  Filter, 
+  Activity,
+  Database,
+  Info,
+  Code,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react";
+import TableHead from "../components/reusable/TableHead";
+import Card from '../components/Card';
+import Button from '../components/Button';
+import Input from '../components/Input';
+import PageHeader from '../components/PageHeader';
+import Badge from '../components/Badge';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const ITEMS_PER_PAGE = 30;
 
 const columns = [
-    "Name",
-    "model",
-    "make",
+    "Command Name",
+    "Model",
+    "Manufacturer",
     "Header",
     "Sub Header",
     "PIN",
     "Protocol",
-    "Formula Based",
-    "Formula (Metric)",
-    "Formula (Imperial)",
-    "Unit (Metric)",
-    "Unit (Imperial)",
-    "Reference JSON"
+    "Logic",
+    "Metric Formula",
+    "Imperial Formula",
+    "Metric Unit",
+    "Imperial Unit",
+    "Reference Data"
 ];
 
 const LiveDateCommands: React.FC = () => {
@@ -28,7 +45,6 @@ const LiveDateCommands: React.FC = () => {
     const [make, setMake] = useState<string>("");
     const [model, setModel] = useState<string>("");
     const [module, setModule] = useState<string>("");
-
 
     const [page, setPage] = useState<number>(1);
     const [total, setTotal] = useState<number>(0);
@@ -41,9 +57,6 @@ const LiveDateCommands: React.FC = () => {
         searchModel: string = "",
         searchModule: string = ""
     ) => {
-        
-        
-        // Cancel previous request
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
@@ -53,7 +66,6 @@ const LiveDateCommands: React.FC = () => {
         setError("");
 
         try {
-            // Build URL parameters
             const params = new URLSearchParams({
                 limit: ITEMS_PER_PAGE.toString(),
                 page: targetPage.toString()
@@ -64,8 +76,6 @@ const LiveDateCommands: React.FC = () => {
             if (searchModule.trim()) params.append('module', searchModule.trim());
 
             const url = `${API_BASE_URL}api/LiveDataCommands?${params.toString()}`;
-            console.log('📡 Making API call to:', url);
-            
             const token = localStorage.getItem("token");
 
             const response = await fetch(url, {
@@ -76,288 +86,234 @@ const LiveDateCommands: React.FC = () => {
                 },
             });
 
-            console.log('📥 Response status:', response.status, response.ok);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ API Error:', errorText);
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
 
             const result = await response.json();
-            console.log('✅ API Response:', result);
 
             if (result && Array.isArray(result.data)) {
-                console.log('📊 Setting data:', {
-                    dataLength: result.data.length,
-                    total: result.total,
-                    targetPage
-                });
-                
                 setLiveData(result.data);
                 setTotal(result.total || 0);
                 setPage(targetPage);
                 
                 if (result.data.length === 0) {
                     setError(searchMake || searchModel || searchModule 
-                        ? "No live data found for the specified criteria." 
-                        : "No live data available."
+                        ? "No live commands found matching your criteria." 
+                        : "No live command data available in database."
                     );
                 }
             } else {
-                console.error('❌ Invalid response structure:', result);
                 setLiveData([]);
                 setTotal(0);
-                setError("Invalid response format from server");
+                setError("Data synchronization error: Invalid format.");
             }
-
         } catch (err: any) {
-            if (err.name === 'AbortError') {
-                console.log('🚫 Request aborted');
-                return;
-            }
-            
-            console.error("❌ Error fetching live data:", err);
+            if (err.name === 'AbortError') return;
+            console.error("Error fetching live data:", err);
             setLiveData([]);
             setTotal(0);
-            setError("Failed to fetch live data. Please try again.");
+            setError("Unable to sync live command data. Please check your network.");
         } finally {
             setLoading(false);
             abortControllerRef.current = null;
-            console.log('✨ fetchLiveData completed');
         }
     };
 
-    // Initial load
     useEffect(() => {
         fetchLiveData(1, "", "", "");
+        return () => {
+            if (abortControllerRef.current) abortControllerRef.current.abort();
+        };
     }, []);
 
-    // Search handler
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         fetchLiveData(1, make, model, module);
     };
 
-    // Page change handler
     const handlePageChange = (newPage: number) => {
-        console.log('🔄 Page change requested:', { 
-            newPage, 
-            currentPage: page, 
-            make, 
-            model, 
-            module,
-            totalPages: Math.ceil(total / ITEMS_PER_PAGE)
-        });
         fetchLiveData(newPage, make, model, module);
     };
 
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
-        };
-    }, []);
-
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
-    // Simple pagination - show up to 5 pages
     const getVisiblePages = () => {
         const pages = [];
         const maxVisible = 5;
-        
         if (totalPages <= maxVisible) {
-            for (let i = 1; i <= totalPages; i++) {
-                pages.push(i);
-            }
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
         } else {
             let start = Math.max(1, page - 2);
             let end = Math.min(totalPages, start + maxVisible - 1);
-            
-            if (end - start < maxVisible - 1) {
-                start = Math.max(1, end - maxVisible + 1);
-            }
-            
-            for (let i = start; i <= end; i++) {
-                pages.push(i);
-            }
+            if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
+            for (let i = start; i <= end; i++) pages.push(i);
         }
-        
         return pages;
     };
 
     return (
-        <div className="min-h-screen flex flex-col p-6 max-w-full mx-auto">
-            <h1 className="text-3xl font-bold text-center text-blue-700 mb-6">
-                Live Details
-            </h1>
-
-            {/* Search Form */}
-            <div className="bg-white border rounded-lg shadow-sm p-6 mb-6">
-                <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <input
-                        type="text"
-                        value={make}
-                        onChange={(e) => setMake(e.target.value)}
-                        placeholder="Make"
-                        className="border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                        type="text"
-                        value={model}
-                        onChange={(e) => setModel(e.target.value)}
-                        placeholder="Model"
-                        className="border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                        type="text"
-                        value={module}
-                        onChange={(e) => setModule(e.target.value)}
-                        placeholder="Module"
-                        className="border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50"
+        <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
+            <PageHeader 
+                title="Live Data Commands" 
+                subtitle="Monitor and manage real-time diagnostic commands and parameter mappings"
+                icon={Zap}
+                action={
+                    <Button 
+                        variant="outline" 
+                        onClick={() => fetchLiveData(1, make, model, module)} 
+                        isLoading={loading}
+                        icon={Activity}
                     >
-                        {loading ? "Loading..." : "Fetch"}
-                    </button>
-                </form>
-            </div>
+                        Sync Manifest
+                    </Button>
+                }
+            />
 
-            {/* Error Message */}
-            {error && <p className="text-red-500 text-center py-4 text-lg">{error}</p>}
+            <div className="space-y-8">
+                <Card title="Query Builder" subtitle="Filter commands by vehicle infrastructure" icon={Filter}>
+                    <form onSubmit={handleSearch} className="flex flex-col lg:flex-row items-end gap-6">
+                        <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <Input 
+                                label="Manufacturer" 
+                                placeholder="e.g. Honda"
+                                value={make}
+                                onChange={(e) => setMake(e.target.value)}
+                                icon={Database}
+                            />
+                            <Input 
+                                label="Model" 
+                                placeholder="e.g. CBR 650R"
+                                value={model}
+                                onChange={(e) => setModel(e.target.value)}
+                                icon={Search}
+                            />
+                            <Input 
+                                label="Module / System" 
+                                placeholder="e.g. ECU"
+                                value={module}
+                                onChange={(e) => setModule(e.target.value)}
+                                icon={Info}
+                            />
+                        </div>
+                        
+                        <Button type="submit" variant="primary" className="px-10 h-11 shadow-lg shadow-primary-200" isLoading={loading} icon={Search}>
+                            Execute Query
+                        </Button>
+                    </form>
+                </Card>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto space-y-6">
-                {loading ? (
-                    <div className="flex items-center justify-center py-20">
-                        <div className="text-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                            <p className="text-blue-500 text-xl">Loading live data...</p>
-                            <p className="text-gray-500 mt-2">Please wait while we fetch the data</p>
+                <Card noPadding title="Command Specification Registry" icon={Code} headerAction={<Badge variant="secondary">{total} Active Commands</Badge>}>
+                    {loading ? (
+                        <div className="p-32 text-center">
+                            <div className="animate-spin h-14 w-14 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-6 shadow-sm"></div>
+                            <p className="text-slate-400 font-black italic tracking-widest animate-pulse uppercase text-xs">Syncing real-time command data...</p>
                         </div>
-                    </div>
-                ) : liveData.length > 0 ? (
-                    <div className="bg-white border rounded-lg shadow-sm p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold text-blue-700">
-                                Live Data Results
-                            </h2>
-                            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                                {liveData.length} items
-                            </span>
+                    ) : error ? (
+                        <div className="p-24 text-center animate-fadeIn">
+                            <div className="inline-flex items-center justify-center w-20 h-20 bg-rose-50 text-rose-500 rounded-[28px] mb-6 shadow-sm border border-rose-100/50">
+                                <Activity size={32} />
+                            </div>
+                            <p className="text-slate-700 font-black text-xl mb-2 italic">Data Synchronization Failure</p>
+                            <p className="text-slate-400 max-w-sm mx-auto mb-8 font-bold text-sm tracking-tight">{error}</p>
+                            <Button variant="primary" className="h-11 px-8 shadow-lg shadow-primary-200" onClick={() => fetchLiveData(1, make, model, module)} icon={RefreshCw}>Reconnect Stream</Button>
                         </div>
+                    ) : liveData.length === 0 ? (
+                        <div className="p-32 text-center italic animate-fadeIn">
+                            <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-50 text-slate-200 rounded-[28px] mb-6 border border-slate-100">
+                                <Search size={32} />
+                            </div>
+                            <p className="text-slate-400 font-black tracking-widest text-xs uppercase">No command data identified</p>
+                        </div>
+                    ) : (
                         <div className="overflow-x-auto">
-                            <table className="min-w-full text-sm border">
-                                <TableHead columns={columns} />
-                                <tbody>
+                            <table className="w-full text-left text-[11px]">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-100 font-black text-slate-400 uppercase tracking-widest">
+                                        <TableHead columns={columns} />
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
                                     {liveData.map((item, idx) => (
-                                        <tr key={`${item.id || idx}`} className="hover:bg-gray-50">
-                                            <td className="border px-3 py-2">
-                                                {item.name || "-"}
+                                        <tr key={`${item.id || idx}`} className="hover:bg-primary-50/30 transition-all group">
+                                            <td className="px-6 py-4 font-black text-slate-700 tracking-tight whitespace-nowrap">{item.name || "-"}</td>
+                                            <td className="px-6 py-4 text-slate-500 font-bold italic">{item.model || "-"}</td>
+                                            <td className="px-6 py-4 text-slate-400 font-bold uppercase tracking-tighter truncate max-w-[100px]">{item.make || "-"}</td>
+                                            <td className="px-6 py-4 font-black text-slate-600 font-mono text-[10px]">{item.header || "-"}</td>
+                                            <td className="px-6 py-4 text-slate-400 font-mono text-[10px]">{item.subHeader || "-"}</td>
+                                            <td className="px-6 py-4">
+                                              <code className="bg-slate-900 text-primary-400 px-2 py-1 rounded-lg font-mono text-[10px] font-black tracking-wider shadow-sm">{item.pid || "-"}</code>
                                             </td>
-                                            <td className="border px-3 py-2">
-                                                {item.model || "-"}
+                                            <td className="px-6 py-4 text-slate-400 font-bold truncate max-w-[100px]">{item.protocol || "-"}</td>
+                                            <td className="px-6 py-4">
+                                                <Badge variant={item.formulaBased === 'true' ? 'primary' : 'secondary'}>
+                                                    {item.formulaBased === 'true' ? "Active" : "Static"}
+                                                </Badge>
                                             </td>
-                                            <td className="border px-3 py-2">
-                                                {item.make || "-"}
+                                            <td className="px-6 py-4 max-w-[120px] truncate border-l border-slate-50/50">
+                                                <span className="text-slate-500 font-mono font-bold" title={item.formula_metric}>{item.formula_metric || "-"}</span>
                                             </td>
-                                            <td className="border px-3 py-2">
-                                                {item.header || "-"}
+                                            <td className="px-6 py-4 max-w-[120px] truncate border-l border-slate-50/50">
+                                                <span className="text-slate-500 font-mono font-bold" title={item.formula_imperial}>{item.formula_imperial || "-"}</span>
                                             </td>
-                                            <td className="border px-3 py-2">
-                                                {item.subHeader || "-"}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {item.pid || "-"}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {item.protocol || "-"}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {item.formulaBased || "-"}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {item.formula_metric || "-"}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {item.formula_imperial || "-"}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {item.unit_metric || "-"}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {item.unit_imperial || "-"}
-                                            </td>
-                                            <td className="border px-3 py-2">
-                                                {item.referenceJSON ? JSON.stringify(item.referenceJSON): "-"}
+                                            <td className="px-6 py-4 font-black text-primary-600 italic">{item.unit_metric || "-"}</td>
+                                            <td className="px-6 py-4 font-black text-amber-600 italic">{item.unit_imperial || "-"}</td>
+                                            <td className="px-6 py-4">
+                                                {item.referenceJSON ? (
+                                                    <div className="flex items-center gap-1.5 text-primary-500 cursor-help" title={JSON.stringify(item.referenceJSON)}>
+                                                        <Code size={14} />
+                                                        <span className="font-black text-[10px] uppercase">JSON</span>
+                                                    </div>
+                                                ) : <span className="text-slate-300">-</span>}
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                ) : !error && (
-                    <div className="text-center py-20">
-                        <p className="text-gray-500 text-xl">No live data to display</p>
-                        <p className="text-gray-400 mt-2">Try searching with different criteria</p>
-                    </div>
-                )}
+                    )}
+
+                    {totalPages > 1 && (
+                        <div className="p-6 bg-slate-50/30 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                Manifest Fragment <span className="text-primary-600 font-black">{page}</span> of <span className="text-slate-900 font-black">{totalPages}</span>
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => handlePageChange(page - 1)}
+                                    disabled={page === 1 || loading}
+                                    className="w-11 h-11 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+
+                                <div className="flex gap-2 mx-4">
+                                    {getVisiblePages().map((pageNum) => (
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => handlePageChange(pageNum)}
+                                            disabled={loading}
+                                            className={`w-10 h-10 rounded-xl text-[11px] font-black transition-all ${
+                                                page === pageNum
+                                                    ? "bg-primary-600 text-white shadow-lg shadow-primary-200"
+                                                    : "bg-white text-slate-600 hover:bg-primary-50 border border-slate-100"
+                                            } disabled:opacity-50`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <button
+                                    onClick={() => handlePageChange(page + 1)}
+                                    disabled={page === totalPages || loading}
+                                    className="w-11 h-11 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </Card>
             </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-4 mt-6">
-                    <button
-                        onClick={() => handlePageChange(page - 1)}
-                        disabled={page === 1 || loading}
-                        className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition"
-                    >
-                        Previous
-                    </button>
-
-                    <div className="flex gap-2">
-                        {getVisiblePages().map((pageNum) => (
-                            <button
-                                key={pageNum}
-                                onClick={() => handlePageChange(pageNum)}
-                                disabled={loading}
-                                className={`px-3 py-2 rounded transition ${
-                                    page === pageNum
-                                        ? "bg-blue-600 text-white"
-                                        : "bg-gray-200 hover:bg-gray-300"
-                                } disabled:opacity-50`}
-                            >
-                                {pageNum}
-                            </button>
-                        ))}
-                    </div>
-
-                    <button
-                        onClick={() => handlePageChange(page + 1)}
-                        disabled={page === totalPages || loading}
-                        className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition"
-                    >
-                        Next
-                    </button>
-                </div>
-            )}
-
-            {/* Stats */}
-            {total > 0 && (
-                <div className="text-center text-sm text-gray-500 mt-2 bg-white rounded-lg p-4 border">
-                    <div className="flex flex-wrap justify-center items-center gap-6">
-                        <span>📄 Page {page} of {totalPages}</span>
-                        <span>📊 Total Items: {total}</span>
-                        <span>🔧 Current Page Items: {liveData.length}</span>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

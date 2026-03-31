@@ -4,17 +4,17 @@ import Api2 from "./Services/Api2";
 import BikeMakeList from './Services/BikeMakeList.tsx'
 import ModelListPage from './Services/ModelListPage.tsx'
 import Customcommands1 from './Services/Customcommands1.tsx'
-import Layout from "./Compontens/Layout.tsx";
-import ActuationFetcher from './Services/ActuationFetcher .tsx'
-import CommandFetcher from './Services/CommandFetcher .tsx'
+import Layout from "./components/Layout.tsx";
+import ActuationFetcher from './Services/ActuationFetcher.tsx'
+import CommandFetcher from './Services/CommandFetcher.tsx'
 import OdometerDetails from './Services/OdometerDetails.tsx'
 import FileUploader from './Services/Updatecommand.tsx'
 import UsersTable from "./Services/UsersTable.tsx";
-import AdminUsersTable from "./Services/AdminUsersTable.tsx";
+import AdminUsersTable from "./pages/AdminUsersTable.tsx";
 import ObdScanReport from "./Services/Scandetail.tsx";
-import ScanDetailPage from "./Compontens/ScanDetails/ScanDetailsPage.tsx";
-import SpdetailsPage from "./Compontens/SpecialFunctions/SpdetailsPage.tsx";
-import ActuationsDetailpage from "./Compontens/ActuationsDetails/ActuationsDetailpage.tsx";
+import ScanDetailPage from "./components/ScanDetails/ScanDetailsPage.tsx";
+import SpdetailsPage from "./components/SpecialFunctions/SpdetailsPage.tsx";
+import ActuationsDetailpage from "./components/ActuationsDetails/ActuationsDetailpage.tsx";
 import SpecilaFunction from "./Services/SpecialFunctions.tsx";
 import ActuationsDetail from "./Services/ActuationsDetail.tsx";
 // import FaultCodesUploader from "./Services/FaultCodesUploader.tsx";

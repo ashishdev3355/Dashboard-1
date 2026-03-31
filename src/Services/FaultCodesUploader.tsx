@@ -1,27 +1,28 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { useState, useCallback } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Database, Trash2, Eye, Clock, BarChart3 } from 'lucide-react';
+import { 
+  Upload, 
+  FileSpreadsheet, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle, 
+  Database, 
+  Trash2, 
+  Eye, 
+  Clock, 
+  BarChart3,
+  FileUp,
+  ShieldCheck,
+  Zap,
+  Info,
+  Activity
+} from 'lucide-react';
+import Card from '../components/Card';
+import Button from '../components/Button';
+import PageHeader from '../components/PageHeader';
+import Badge from '../components/Badge';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/';
 
-// Type definitions matching backend response
 interface TableStats {
   inserted: number;
   duplicates: number;
@@ -58,13 +59,6 @@ interface UploadResult {
     my_fault_code_solutions: TableStats;
   };
   error?: string;
-}
-
-interface StatCardProps {
-  title: string;
-  data?: TableStats;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
 }
 
 const FaultCodesUploader = () => {
@@ -105,13 +99,12 @@ const FaultCodesUploader = () => {
     ];
     
     if (!allowedTypes.includes(selectedFile.type)) {
-      setError('Please select an Excel file (.xlsx or .xls)');
+      setError('Standard protocol requires Excel format (.xlsx or .xls)');
       return;
     }
     
-    // Match backend limit of 100MB
     if (selectedFile.size > 100 * 1024 * 1024) {
-      setError('File size must be less than 100MB');
+      setError('Payload exceeds maximum allowable size (100MB)');
       return;
     }
     
@@ -129,7 +122,7 @@ const FaultCodesUploader = () => {
 
   const uploadFile = async () => {
     if (!file) {
-      setError('Please select a file first');
+      setError('No source file identified for ingestion');
       return;
     }
 
@@ -141,15 +134,12 @@ const FaultCodesUploader = () => {
     formData.append('file', file);
 
     try {
-      // Simulate progress for better UX
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => Math.min(prev + 10, 90));
-      }, 500);
+      }, 300);
 
       const token = localStorage.getItem("token");
       const endpoint = `${BASE_URL}api/FaultUplodes`;
-      
-      console.log(`Uploading to: ${endpoint}`);
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -162,42 +152,25 @@ const FaultCodesUploader = () => {
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      // Handle different response types
       const contentType = response.headers.get('content-type');
       let result: UploadResult;
 
       if (contentType && contentType.includes('application/json')) {
         result = await response.json();
       } else {
-        const textResponse = await response.text();
-        console.error('Non-JSON response:', textResponse);
-        throw new Error(`Server returned non-JSON response: ${textResponse.substring(0, 200)}`);
+        throw new Error(`System error: Protocol mismatch during transmission`);
       }
 
       if (response.ok && result.success) {
         setUploadResult(result);
         setFile(null);
-        // Reset file input
         const fileInput = document.getElementById('file-input') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
       } else {
-        throw new Error(result.message || result.error || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(result.message || result.error || `Access point error: ${response.status}`);
       }
-    } catch (err: unknown) {
-      console.error('Upload error:', err);
-      let errorMessage = 'An unknown error occurred during upload';
-      
-      if (err instanceof Error) {
-        errorMessage = err.message;
-        
-        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-          errorMessage = 'Cannot connect to server. Please check if the server is running and the URL is correct.';
-        } else if (err.message.includes('timeout')) {
-          errorMessage = 'Upload timeout. The file may be too large or the server is busy.';
-        }
-      }
-      
-      setError(errorMessage);
+    } catch (err: any) {
+      setError(err.message || 'Transmission failure during ingestion');
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -219,7 +192,7 @@ const FaultCodesUploader = () => {
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
@@ -229,329 +202,196 @@ const FaultCodesUploader = () => {
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
-  const StatCard: React.FC<StatCardProps> = ({ title, data, icon: Icon, color }) => (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-medium text-gray-700">{title}</h4>
-        <Icon className={`w-5 h-5 ${color}`} />
+  const StatBox = ({ title, data, icon: Icon, colorClass }: { title: string, data?: TableStats, icon: any, colorClass: string }) => (
+    <div className="bg-slate-50/50 rounded-2xl border border-slate-100 p-5 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all group">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{title}</h4>
+        <Icon className={`w-5 h-5 ${colorClass} opacity-40 group-hover:opacity-100 transition-opacity`} />
       </div>
-      <div className="space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Inserted:</span>
-          <span className="font-medium text-green-600">{data?.inserted || 0}</span>
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-bold text-slate-500">Inserted</span>
+          <code className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg font-black text-sm">{data?.inserted || 0}</code>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Duplicates:</span>
-          <span className="font-medium text-yellow-600">{data?.duplicates || 0}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-bold text-slate-500">Duplicates</span>
+          <code className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-lg font-black text-sm">{data?.duplicates || 0}</code>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Skipped:</span>
-          <span className="font-medium text-red-600">{data?.skipped || 0}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-bold text-slate-500">Skipped</span>
+          <code className="bg-rose-50 text-rose-600 px-2 py-0.5 rounded-lg font-black text-sm">{data?.skipped || 0}</code>
         </div>
-        {data?.processingTime && (
-          <div className="flex justify-between text-sm pt-1 border-t border-gray-100">
-            <span className="text-gray-600">Time:</span>
-            <span className="font-medium text-blue-600">{formatDuration(data.processingTime)}</span>
-          </div>
-        )}
       </div>
-      
-      {/* Duplicate breakdown */}
-      {data?.duplicateBreakdown && (data.duplicateBreakdown.excelDuplicates > 0 || data.duplicateBreakdown.databaseDuplicates > 0) && (
-        <div className="mt-3 pt-2 border-t border-gray-100">
-          <p className="text-xs text-gray-500 mb-1">Duplicate Sources:</p>
-          <div className="space-y-1">
-            {data.duplicateBreakdown.excelDuplicates > 0 && (
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Excel:</span>
-                <span className="text-yellow-600">{data.duplicateBreakdown.excelDuplicates}</span>
-              </div>
-            )}
-            {data.duplicateBreakdown.databaseDuplicates > 0 && (
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Database:</span>
-                <span className="text-yellow-600">{data.duplicateBreakdown.databaseDuplicates}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-gray-50 min-h-screen">
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-8">
-          <div className="flex items-center space-x-3">
-            <Database className="w-8 h-8 text-white" />
-            <div>
-              <h1 className="text-2xl font-bold text-white">Fault Codes Bulk Uploader</h1>
-              <p className="text-blue-100 mt-1">Import Excel files with fault descriptions, causes, symptoms, and solutions</p>
+    <div className="max-w-5xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
+      <PageHeader 
+        title="Fault Intelligence Ingestion" 
+        subtitle="Mass-import diagnostic datasets across structural diagnostic categories"
+        icon={Database}
+      />
+
+      {!uploadResult ? (
+        <div className="space-y-8">
+          <Card title="Source Selection" icon={FileUp}>
+            <div
+              className={`relative border-2 border-dashed rounded-3xl p-12 text-center transition-all duration-300 ${
+                dragActive
+                  ? 'border-primary-400 bg-primary-50/50'
+                  : file
+                  ? 'border-emerald-300 bg-emerald-50/20'
+                  : 'border-slate-200 bg-slate-50/50 hover:border-primary-300 hover:bg-white'
+              }`}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+            >
+              <input
+                id="file-input"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileInputChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={uploading}
+              />
+              
+              {file ? (
+                <div className="space-y-6">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto animate-bounce-slow">
+                    <FileSpreadsheet className="w-10 h-10 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-black text-slate-800">{file.name}</p>
+                    <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">{formatFileSize(file.size)}</p>
+                  </div>
+                  <Button variant="secondary" onClick={removeFile} disabled={uploading} icon={Trash2}>
+                    Purge Selection
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="w-20 h-20 bg-primary-50 rounded-3xl flex items-center justify-center mx-auto">
+                    <Upload className="w-10 h-10 text-primary-500" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-black text-slate-800">Drop system export or click to browse</p>
+                    <p className="text-sm font-bold text-slate-400 mt-2 tracking-wide">Supports .xlsx and .xls protocol (Max 100MB)</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {uploading && (
+              <div className="mt-8 space-y-3">
+                <div className="flex justify-between items-center text-xs font-black text-slate-400 uppercase tracking-widest">
+                  <span>Processing Diagnostic Stream...</span>
+                  <span className="text-primary-600">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200 p-0.5">
+                  <div
+                    className="bg-primary-600 h-full rounded-full transition-all duration-300 shadow-sm shadow-primary-200"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card title="Structural Guidance" icon={Info}>
+              <div className="space-y-4">
+                <p className="text-sm font-bold text-slate-500 leading-relaxed italic">System expects an Excel workbook with the following defined sheets:</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="w-2 h-2 rounded-full bg-primary-500" />
+                    <span className="text-xs font-black text-slate-600">fault_descriptions</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-xs font-black text-slate-600">causes</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span className="text-xs font-black text-slate-600">symptoms</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="w-2 h-2 rounded-full bg-purple-500" />
+                    <span className="text-xs font-black text-slate-600">solutions</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <div className="flex flex-col justify-center items-center p-8 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+               <Button 
+                variant="primary" 
+                size="lg" 
+                className="w-full max-w-xs h-14 text-lg" 
+                onClick={uploadFile} 
+                disabled={!file || uploading}
+                isLoading={uploading}
+                icon={ShieldCheck}
+              >
+                Execute Ingestion
+              </Button>
+              {error && (
+                <div className="mt-4 flex items-center gap-2 text-rose-600 font-bold text-sm animate-shake">
+                  <XCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
-
-        <div className="p-6">
-          {/* Upload Section */}
-          {!uploadResult && (
-            <div className="space-y-6">
-              {/* File Drop Zone */}
-              <div
-                className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
-                  dragActive
-                    ? 'border-blue-400 bg-blue-50'
-                    : file
-                    ? 'border-green-300 bg-green-50'
-                    : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
-                }`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-              >
-                <input
-                  id="file-input"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleFileInputChange}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  disabled={uploading}
-                />
-                
-                {file ? (
-                  <div className="space-y-4">
-                    <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto" />
-                    <div>
-                      <p className="text-lg font-medium text-green-700">{file.name}</p>
-                      <p className="text-sm text-gray-600">{formatFileSize(file.size)}</p>
-                    </div>
-                    <button
-                      onClick={removeFile}
-                      disabled={uploading}
-                      className="inline-flex items-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition-colors disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <Upload className="w-16 h-16 text-gray-400 mx-auto" />
-                    <div>
-                      <p className="text-lg font-medium text-gray-700">
-                        Drop your Excel file here or click to browse
-                      </p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        Supports .xlsx and .xls files up to 100MB
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Progress Bar */}
-              {uploading && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Uploading and processing...</span>
-                    <span className="text-gray-600">{uploadProgress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${uploadProgress}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {/* Expected Sheets Info */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-medium text-blue-900 mb-2">Expected Excel Sheets:</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-blue-700">fault_descriptions</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-blue-700">causes</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <span className="text-blue-700">symptoms</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <span className="text-blue-700">solutions</span>
-                  </div>
-                </div>
-                <p className="text-xs text-blue-600 mt-2">
-                  * Each sheet should have headers in the first row. Empty rows will be skipped.
-                </p>
-              </div>
-
-              {/* Connection Test */}
-              {/* <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-xs text-gray-600">
-                  <strong>API Endpoint:</strong> {BASE_URL}api/FaultUplodes
-                </p>
-              </div> */}
-
-              {/* Error Display */}
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
-                  <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h4 className="font-medium text-red-900">Upload Error</h4>
-                    <p className="text-red-700 text-sm mt-1">{error}</p>
-                    {error.includes('Cannot connect to server') && (
-                      <div className="mt-2 text-xs text-red-600">
-                        <p>Troubleshooting tips:</p>
-                        <ul className="list-disc list-inside ml-2 space-y-1">
-                          <li>Check if the backend server is running</li>
-                          <li>Verify the API endpoint URL</li>
-                          <li>Check for CORS issues in browser console</li>
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Upload Button */}
-              <div className="flex justify-center">
-                <button
-                  onClick={uploadFile}
-                  disabled={!file || uploading}
-                  className="inline-flex items-center px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105 disabled:hover:scale-100"
-                >
-                  {uploading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-5 h-5 mr-2" />
-                      Upload & Import
-                    </>
-                  )}
-                </button>
-              </div>
+      ) : (
+        <div className="space-y-8 animate-fadeIn">
+          <div className="bg-white rounded-[32px] border border-slate-100 p-8 text-center shadow-2xl shadow-emerald-100/50">
+            <div className="w-20 h-20 bg-emerald-100 rounded-[24px] flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-10 h-10 text-emerald-600" />
             </div>
-          )}
-
-          {/* Success Results */}
-          {uploadResult && uploadResult.success && (
-            <div className="space-y-6">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-green-900 mb-2">Import Successful!</h3>
-                <p className="text-green-700">{uploadResult.message}</p>
-                
-                {/* Overall Stats */}
-                {uploadResult.stats && (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div className="bg-white rounded-lg p-3 border border-green-200">
-                      <div className="flex items-center justify-center space-x-2">
-                        <BarChart3 className="w-4 h-4 text-blue-500" />
-                        <span className="font-medium">Total Inserted</span>
-                      </div>
-                      <p className="text-lg font-bold text-green-600 mt-1">{uploadResult.stats.totalRowsInserted}</p>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 border border-green-200">
-                      <div className="flex items-center justify-center space-x-2">
-                        <Clock className="w-4 h-4 text-purple-500" />
-                        <span className="font-medium">Processing Time</span>
-                      </div>
-                      <p className="text-lg font-bold text-green-600 mt-1">{formatDuration(uploadResult.stats.totalProcessingTime)}</p>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 border border-green-200">
-                      <div className="flex items-center justify-center space-x-2">
-                        <FileSpreadsheet className="w-4 h-4 text-orange-500" />
-                        <span className="font-medium">File Size</span>
-                      </div>
-                      <p className="text-lg font-bold text-green-600 mt-1">{formatFileSize(uploadResult.stats.fileSize)}</p>
-                    </div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2">Ingestion Cycle Complete</h3>
+            <p className="text-slate-500 font-bold italic">{uploadResult.message}</p>
+            
+            {uploadResult.stats && (
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    <BarChart3 size={12} /> Total Records
                   </div>
-                )}
-
-                {/* Performance Info */}
-                {uploadResult.stats?.performance && (
-                  <div className="mt-3 text-xs text-green-600">
-                    <p>Performance: {uploadResult.stats.performance.rowsPerSecond} rows/sec</p>
-                    <p>{uploadResult.stats.performance.improvement}</p>
+                  <p className="text-2xl font-black text-emerald-600">{uploadResult.stats.totalRowsInserted}</p>
+                </div>
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    <Clock size={12} /> Execution Time
                   </div>
-                )}
-              </div>
-
-              {/* Detailed Import Statistics */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Detailed Import Statistics</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <StatCard
-                    title="Fault Codes"
-                    data={uploadResult.summary?.my_fault_codes}
-                    icon={Database}
-                    color="text-blue-500"
-                  />
-                  <StatCard
-                    title="Causes"
-                    data={uploadResult.summary?.my_fault_code_causes}
-                    icon={AlertCircle}
-                    color="text-green-500"
-                  />
-                  <StatCard
-                    title="Symptoms"
-                    data={uploadResult.summary?.my_fault_code_symptoms}
-                    icon={Eye}
-                    color="text-yellow-500"
-                  />
-                  <StatCard
-                    title="Solutions"
-                    data={uploadResult.summary?.my_fault_code_solutions}
-                    icon={CheckCircle}
-                    color="text-purple-500"
-                  />
+                  <p className="text-2xl font-black text-primary-600">{formatDuration(uploadResult.stats.totalProcessingTime)}</p>
+                </div>
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <div className="flex items-center justify-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    <FileSpreadsheet size={12} /> Payload Size
+                  </div>
+                  <p className="text-2xl font-black text-amber-600">{formatFileSize(uploadResult.stats.fileSize)}</p>
                 </div>
               </div>
+            )}
+          </div>
 
-              {/* Actions */}
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={resetUpload}
-                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Upload className="w-5 h-5 mr-2" />
-                  Upload Another File
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatBox title="Fault Codes" data={uploadResult.summary?.my_fault_codes} icon={Zap} colorClass="text-blue-500" />
+            <StatBox title="Causal Hub" data={uploadResult.summary?.my_fault_code_causes} icon={AlertCircle} colorClass="text-emerald-500" />
+            <StatBox title="Symptom Index" data={uploadResult.summary?.my_fault_code_symptoms} icon={Eye} colorClass="text-amber-500" />
+            <StatBox title="Resolution Repository" data={uploadResult.summary?.my_fault_code_solutions} icon={ShieldCheck} colorClass="text-purple-500" />
+          </div>
 
-          {/* Failed Results */}
-          {uploadResult && !uploadResult.success && (
-            <div className="space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-red-900 mb-2">Import Failed</h3>
-                <p className="text-red-700">{uploadResult.message || uploadResult.error}</p>
-              </div>
-              
-              <div className="flex justify-center">
-                <button
-                  onClick={resetUpload}
-                  className="inline-flex items-center px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="flex justify-center pt-8">
+            <Button variant="secondary" onClick={resetUpload} size="lg" icon={Upload}>
+              Initiate New Cycle
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
