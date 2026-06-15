@@ -1,20 +1,5 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
-import { 
-  Zap, 
-  Database, 
-  Car, 
-  Calendar,
-  ShieldAlert,
-  Terminal,
-  Cpu,
-  Layers,
-  Code
-} from 'lucide-react';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Input from '../components/Input';
-import PageHeader from '../components/PageHeader';
-import Badge from '../components/Badge';
+import React, { useEffect, useState } from "react";
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -38,39 +23,29 @@ const CustomCommands: React.FC = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  const fetchCustomCommands = useCallback(async (pageNumber = 1, currentMake?: string, currentModel?: string, currentYear?: string) => {
-    if (abortControllerRef.current) abortControllerRef.current.abort();
-    abortControllerRef.current = new AbortController();
-
+  const fetchCustomCommands = async (pageNumber = 1) => {
     setLoading(true);
     setError("");
 
-    const searchMake = currentMake !== undefined ? currentMake : make;
-    const searchModel = currentModel !== undefined ? currentModel : model;
-    const searchYear = currentYear !== undefined ? currentYear : year;
-
     try {
       const params = new URLSearchParams();
-      if (searchMake.trim()) params.append("make", searchMake);
-      if (searchModel.trim()) params.append("model", searchModel);
-      if (searchYear.trim()) params.append("year", searchYear);
+      if (make) params.append("make", make);
+      if (model) params.append("model", model);
+      if (year) params.append("year", year);
       params.append("page", pageNumber.toString());
       params.append("limit", ITEMS_PER_PAGE.toString());
 
-      const url = `${API_BASE_URL}api/CustomCommands?${params.toString()}`;
+      const url = params.toString()
+        ? `${API_BASE_URL}api/CustomCommands?${params.toString()}`
+        : `${API_BASE_URL}api/CustomCommands`;
       const token = localStorage.getItem("token");
-      
-      const response = await fetch(url, {
-        signal: abortControllerRef.current.signal,
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const response = await fetch(url,{
+         headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ attach token
         },
       });
-
-      if (!response.ok) throw new Error(`Connectivity failure: ${response.status}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
       const json = await response.json();
 
@@ -89,195 +64,201 @@ const CustomCommands: React.FC = () => {
       } else {
         setData([]);
         setTotal(0);
-        setError(searchMake || searchModel || searchYear ? "Criteria returned zero protocol matches." : "Custom command repository is currently empty.");
+        setError("No custom commands found for the given car details.");
       }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setError("Failed to synchronize with custom protocol server.");
+      console.error("Fetch error:", err);
+      setError("Failed to fetch commands");
     } finally {
       setLoading(false);
-      abortControllerRef.current = null;
     }
-  }, [make, model, year]);
+  };
 
+ 
   useEffect(() => {
     fetchCustomCommands(1);
-    return () => {
-      if (abortControllerRef.current) abortControllerRef.current.abort();
-    };
   }, []);
-
-  const handleSearch = () => {
-    setPage(1);
-    fetchCustomCommands(1, make, model, year);
-  };
-
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-    fetchCustomCommands(newPage, make, model, year);
-  };
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
+  // Generate page numbers to show
   const generatePageNumbers = () => {
     const pages = [];
     const maxVisiblePages = 5;
+    
     let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2));
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    // Adjust start page if we're near the end
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    
     return pages;
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-12 px-2">
-      <PageHeader 
-        title="Custom Command Registry" 
-        subtitle="Manage and analyze bespoke vehicle diagnostic sequences and command sets."
-        icon={Terminal}
-      />
+    <div className="flex flex-col ml-5 w-full min-h-screen bg-gray-50 p-6">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">
+        Custom Commands Viewer
+      </h2>
 
-      <Card title="Protocol Filter" subtitle="Find sequences by vehicle specifications" icon={Layers}>
+      {/* Filters and Buttons */}
+      <div className="flex flex-col gap-4 mb-6">
+        {/* Filters row */}
+        
+
         <form
           onSubmit={(e) => {
-            e.preventDefault();
-            handleSearch();
+            e.preventDefault(); // prevent page reload
+            setPage(1);
+            fetchCustomCommands(1);
           }}
-          className="space-y-6"
         >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Input 
-              label="Manufacturer" 
-              placeholder="e.g. BMW, Audi"
+          <div className="flex flex-wrap gap-4">
+            <input
+              type="text"
+              placeholder="Make"
+              className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={make}
               onChange={(e) => setMake(e.target.value)}
-              icon={Database}
             />
-            <Input 
-              label="Model Specification" 
-              placeholder="e.g. X5, A6"
+            <input
+              type="text"
+              placeholder="Model"
+              className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              icon={Car}
             />
-            <Input 
-              label="Production Year" 
-              placeholder="e.g. 2022"
+            <input
+              type="text"
+              placeholder="Year"
+              className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={year}
               onChange={(e) => setYear(e.target.value)}
-              icon={Calendar}
             />
-          </div>
-          <div className="flex justify-end pt-2">
-            <Button type="submit" variant="primary" className="px-10 h-12 shadow-xl shadow-primary-200" isLoading={loading}>
-              Execute Sync
-            </Button>
+            <button
+              type="submit" // ✅ makes Enter work
+              className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition-all"
+            >
+              Search
+            </button>
           </div>
         </form>
-      </Card>
 
-      <div className="space-y-6">
+        
+      
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 bg-white rounded-lg shadow-md overflow-x-auto">
         {loading ? (
-          <div className="p-32 text-center">
-            <div className="animate-spin h-14 w-14 border-[5px] border-primary-600 border-t-transparent rounded-full mx-auto mb-8 shadow-inner shadow-primary-50"></div>
-            <p className="text-slate-400 font-black tracking-[0.2em] animate-pulse">SYNCHRONIZING CUSTOM PROTOCOLS...</p>
-          </div>
+          <p className="p-4 text-gray-500">Loading...</p>
         ) : error ? (
-          <div className="p-24 text-center bg-white rounded-[32px] border border-slate-100 shadow-xl">
-            <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <ShieldAlert className="w-10 h-10 text-red-500" />
-            </div>
-            <h3 className="text-xl font-black text-slate-800 mb-2">Sync Interrupted</h3>
-            <p className="text-slate-500 font-bold italic mb-8 mx-auto max-w-xs">{error}</p>
-            <Button variant="outline" onClick={() => fetchCustomCommands(1)}>Resume Sync</Button>
-          </div>
-        ) : data.length > 0 ? (
-          data.map((item, idx) => (
-            <Card 
-              key={idx} 
-              title={item.function_name} 
-              subtitle={`${item.make} ${item.model}`}
-              icon={Zap}
-              noPadding
-            >
-              <div className="p-6 space-y-6">
-                <div className="flex flex-wrap gap-2">
-                  {item.variant.map((v, i) => (
-                    <Badge key={i} variant="secondary" className="bg-slate-50 text-slate-500 border-slate-200">
-                      Variant: {v}
-                    </Badge>
-                  ))}
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Code className="w-4 h-4" />
-                    Command Sequences
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(item.commands).map(([variant, cmds]) => (
-                      <div key={variant} className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">{variant}</span>
-                          <Badge variant="primary">{cmds.length} Steps</Badge>
-                        </div>
-                        <div className="space-y-1">
-                          {cmds.map((cmd, i) => (
-                            <div key={i} className="flex gap-2 text-[11px]">
-                              <span className="text-slate-300 font-black w-4">{i + 1}.</span>
-                              <code className="text-slate-600 font-mono break-all">{cmd}</code>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))
+          <p className="p-4 text-red-500">{error}</p>
+        ) : data.length === 0 ? (
+          <p className="p-4 text-gray-500">No commands found.</p>
         ) : (
-          <div className="p-32 text-center">
-            <Cpu className="w-16 h-16 text-slate-100 mx-auto mb-6" />
-            <p className="text-slate-400 font-bold uppercase tracking-[0.2em] italic">No Protocols Found</p>
-          </div>
+          <table className="w-full text-sm border-collapse">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-6 py-3 text-left text-gray-700 font-semibold border-b">
+                  Function Name
+                </th>
+                <th className="px-6 py-3 text-left text-gray-700 font-semibold border-b">
+                  Make
+                </th>
+                <th className="px-6 py-3 text-left text-gray-700 font-semibold border-b">
+                  Model
+                </th>
+                <th className="px-6 py-3 text-left text-gray-700 font-semibold border-b">
+                  Variants
+                </th>
+                <th className="px-6 py-3 text-left text-gray-700 font-semibold border-b">
+                  Commands
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item, idx) => (
+                <tr key={idx} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 border-b text-gray-800 font-medium">
+                    {item.function_name}
+                  </td>
+                  <td className="px-6 py-4 border-b text-gray-800 font-medium">
+                    {item.make}
+                  </td>
+                  <td className="px-6 py-4 border-b text-gray-800 font-medium">
+                    {item.model}
+                  </td>
+                  <td className="px-6 py-4 border-b text-gray-600">
+                    {item.variant.join(", ")}
+                  </td>
+                  <td className="px-6 py-4 border-b text-gray-700">
+                    <div className="flex flex-col gap-1">
+                      {Object.entries(item.commands).map(([variant, cmds]) => (
+                        <div key={variant}>
+                          <strong>{variant}:</strong>
+                          <ul className="list-disc list-inside ml-4 text-gray-600">
+                            {cmds.map((cmd, i) => (
+                              <li key={i}>{cmd}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex flex-col md:flex-row items-center justify-between p-6 bg-white rounded-[32px] border border-slate-100 shadow-xl gap-4">
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest italic">
-            Sequence Page <span className="text-primary-600">{page}</span> of <span className="text-slate-800">{totalPages}</span>
-          </p>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => handlePageChange(Math.max(1, page - 1))} disabled={page === 1 || loading}>Previous</Button>
-            <div className="hidden sm:flex gap-1">
-              {generatePageNumbers().map((pageNum) => (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  disabled={loading}
-                  className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${
-                    pageNum === page
-                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-200 scale-110'
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                  }`}
-                >
-                   {pageNum}
-                </button>
-              ))}
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => handlePageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages || loading}>Next</Button>
-          </div>
+      {/* New Pagination Design */}
+      <div className="mt-6 flex flex-col items-center space-y-4">
+        {/* Pagination buttons */}
+        <div className="flex items-center space-x-1">
+          <button
+            className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => fetchCustomCommands(page - 1)}
+            disabled={page === 1}
+          >
+            Previous
+          </button>
+
+          {totalPages > 0 && generatePageNumbers().map((pageNum) => (
+            <button
+              key={pageNum}
+              className={`w-10 h-10 rounded-md font-medium transition-colors ${
+                page === pageNum
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+              onClick={() => fetchCustomCommands(pageNum)}
+            >
+              {pageNum}
+            </button>
+          ))}
+
+          <button
+            className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => fetchCustomCommands(page + 1)}
+            disabled={page === (totalPages || 1)}
+          >
+            Next
+          </button>
         </div>
-      )}
-      
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fadeIn { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-      `}</style>
+
+        {/* Showing results text */}
+        <p className="text-gray-600 text-sm">
+          Showing page {page} of {totalPages || 1} ({total} total items)
+        </p>
+      </div>
     </div>
   );
 };

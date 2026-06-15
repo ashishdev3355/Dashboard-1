@@ -1,24 +1,9 @@
 import { useState, useCallback } from 'react';
-import { 
-  Upload, 
-  FileSpreadsheet, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
-  Database, 
-  Trash2, 
-  Key,
-  FileKey,
-  ShieldCheck,
-  ChevronRight,
-  Info
-} from 'lucide-react';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import PageHeader from '../components/PageHeader';
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Database, Trash2, Key } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+// Type definitions
 interface DuplicateDetails {
   inFile: number;
   inDatabase: number;
@@ -35,6 +20,13 @@ interface UploadResult {
   totalRows: number;
   importedRows: number;
   duplicates: DuplicateDetails;
+}
+
+interface StatCardProps {
+  title: string;
+  value: number;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
 }
 
 const ActivationCodesUploader = () => {
@@ -78,12 +70,12 @@ const ActivationCodesUploader = () => {
     const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
     
     if (!allowedTypes.includes(selectedFile.type) && !allowedExtensions.includes(fileExtension)) {
-      setError('Invalid protocol format. Use (.xlsx, .xls, or .csv)');
+      setError('Please select a valid file (.xlsx, .xls, or .csv)');
       return;
     }
     
-    if (selectedFile.size > 10 * 1024 * 1024) {
-      setError('Activation manifest exceeds 10MB limit');
+    if (selectedFile.size > 10 * 1024 * 1024) { // 10MB limit
+      setError('File size must be less than 10MB');
       return;
     }
     
@@ -101,7 +93,7 @@ const ActivationCodesUploader = () => {
 
   const uploadFile = async () => {
     if (!file) {
-      setError('No secure manifest selected for ingestion');
+      setError('Please select a file first');
       return;
     }
 
@@ -112,38 +104,75 @@ const ActivationCodesUploader = () => {
     formData.append('file', file);
 
     try {
+      // Try multiple possible API endpoints
+      const possibleEndpoints = [
+        `${BASE_URL}api/uplodeactivationcode`
+       
+      ];
       const token = localStorage.getItem("token");
-      const endpoint = `${BASE_URL}api/uplodeactivationcode`;
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      let response: Response | undefined;
 
-      if (response.status === 404) {
-        throw new Error('System access point not identified');
+      for (const endpoint of possibleEndpoints) {
+        try {
+          console.log(`Trying endpoint: ${endpoint}`);
+          response = await fetch(endpoint, {
+            method: 'POST',
+            body: formData,
+            headers: {
+            // "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ attach token
+            },
+          });
+          
+          if (response.status !== 404) {
+            break; // Found a working endpoint
+          }
+        } catch (e) {
+          continue;
+        }
       }
 
+      if (!response || response.status === 404) {
+        throw new Error('API endpoint not found. Please check your server configuration.');
+      }
+
+      // Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Incompatible server response protocol');
+        const textResponse = await response.text();
+        console.error('Non-JSON response:', textResponse);
+        throw new Error('Server returned an invalid response. Please check server logs.');
       }
 
       const result: UploadResult = await response.json();
 
       if (response.ok) {
-        setUploadResult({ ...result, success: true });
+        setUploadResult({
+          ...result,
+          success: true
+        });
         setFile(null);
+        // Reset file input
         const fileInput = document.getElementById('file-input') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
       } else {
-        throw new Error(result.message || `Protocol failure: ${response.status}`);
+        throw new Error(result.message || `Server error: ${response.status}`);
       }
-    } catch (err: any) {
-      setError(err.message || 'Transmission failure during activation sequence');
+    } catch (err: unknown) {
+      console.error('Upload error:', err);
+      let errorMessage = 'An unknown error occurred';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        
+        if (err.message.includes('Failed to fetch')) {
+          errorMessage = 'Cannot connect to server. Please check if the server is running.';
+        } else if (err.message.includes('JSON')) {
+          errorMessage = 'Server configuration error. Please check server setup.';
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -162,183 +191,242 @@ const ActivationCodesUploader = () => {
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return '0 Bytes';
     const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + ['B', 'KB', 'MB'][i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const ResultBox = ({ title, value, icon: Icon, variant }: { title: string, value: number, icon: any, variant: 'primary' | 'success' | 'warning' | 'danger' }) => {
-    const colorMap = {
-      primary: 'text-primary-600 bg-primary-50 border-primary-100',
-      success: 'text-emerald-600 bg-emerald-50 border-emerald-100',
-      warning: 'text-amber-600 bg-amber-50 border-amber-100',
-      danger: 'text-rose-600 bg-rose-50 border-rose-100'
-    };
-    return (
-      <div className={`rounded-2xl border p-5 ${colorMap[variant]} group hover:shadow-lg transition-all`}>
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">{title}</h4>
-          <Icon size={16} className="opacity-40 group-hover:opacity-100" />
-        </div>
-        <div className="text-2xl font-black">{value}</div>
+  const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color }) => (
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-medium text-gray-700">{title}</h4>
+        <Icon className={`w-5 h-5 ${color}`} />
       </div>
-    );
-  };
+      <div className="text-2xl font-bold text-gray-900">{value}</div>
+    </div>
+  );
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
-      <PageHeader 
-        title="Security Activation Ingest" 
-        subtitle="Manage secure authorization manifests and fleet activation keys"
-        icon={Key}
-      />
-
-      {!uploadResult ? (
-        <div className="space-y-8">
-          <Card title="Manifest Transmission" icon={FileKey}>
-            <div
-              className={`relative border-2 border-dashed rounded-3xl p-12 text-center transition-all duration-300 ${
-                dragActive
-                  ? 'border-primary-400 bg-primary-50/50'
-                  : file
-                  ? 'border-emerald-300 bg-emerald-50/20'
-                  : 'border-slate-200 bg-slate-50/50 hover:border-primary-300 hover:bg-white'
-              }`}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              <input
-                id="file-input"
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileInputChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                disabled={uploading}
-              />
-              
-              {file ? (
-                <div className="space-y-6">
-                  <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto animate-pulse">
-                    <FileSpreadsheet className="w-10 h-10 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-black text-slate-800">{file.name}</p>
-                    <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">{formatFileSize(file.size)}</p>
-                  </div>
-                  <Button variant="secondary" onClick={removeFile} disabled={uploading} isLoading={uploading} icon={Trash2}>
-                    Purge Selection
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="w-20 h-20 bg-primary-50 rounded-3xl flex items-center justify-center mx-auto">
-                    <Upload className="w-10 h-10 text-primary-500" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-black text-slate-800">Drop security manifest or browse</p>
-                    <p className="text-sm font-bold text-slate-400 mt-2 tracking-wide uppercase">Protocol: .xlsx, .xls, .csv (Max 10MB)</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card title="Required Schema" icon={Info}>
-              <div className="space-y-4">
-                <p className="text-sm font-bold text-slate-500 italic">Workstation expects the following data structure:</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {['ActivationCode', 'Plan', 'Duration', 'Vehicle'].map((tag) => (
-                    <div key={tag} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <ChevronRight size={14} className="text-primary-500" />
-                      <span className="text-xs font-black text-slate-600">{tag}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-
-            <div className="flex flex-col justify-center items-center p-8 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
-               <Button 
-                variant="primary" 
-                size="lg" 
-                className="w-full max-w-xs h-14 text-lg shadow-xl shadow-primary-200" 
-                onClick={uploadFile} 
-                disabled={!file || uploading}
-                isLoading={uploading}
-                icon={ShieldCheck}
-              >
-                Execute Secure Ingest
-              </Button>
-              {error && (
-                <div className="mt-4 flex items-center gap-2 text-rose-600 font-bold text-sm animate-shake">
-                  <AlertCircle size={16} />
-                  <span>{error}</span>
-                </div>
-              )}
+    <div className="max-w-4xl mx-auto p-6 bg-gray-50 min-h-screen">
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-700 px-6 py-8">
+          <div className="flex items-center space-x-3">
+            <Key className="w-8 h-8 text-white" />
+            <div>
+              <h1 className="text-2xl font-bold text-white">Activation Codes Uploader</h1>
+              <p className="text-indigo-100 mt-1">Import CSV or Excel files with activation codes, plans, duration, and vehicle information</p>
             </div>
           </div>
         </div>
-      ) : (
-        <div className="space-y-8 animate-fadeIn">
-          <div className="bg-white rounded-[32px] border border-slate-100 p-8 text-center shadow-xl">
-            <div className="w-20 h-20 bg-emerald-100 rounded-[24px] flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-10 h-10 text-emerald-600" />
-            </div>
-            <h3 className="text-2xl font-black text-slate-800 mb-2">Manifest Synchronized</h3>
-            <p className="text-slate-500 font-bold italic">{uploadResult.message}</p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <ResultBox title="Registry Rows" value={uploadResult.totalRows} icon={Database} variant="primary" />
-            <ResultBox title="Imported Keys" value={uploadResult.importedRows} icon={ShieldCheck} variant="success" />
-            <ResultBox title="File Collsions" value={uploadResult.duplicates?.inFile || 0} icon={AlertCircle} variant="warning" />
-            <ResultBox title="DB Collisions" value={uploadResult.duplicates?.inDatabase || 0} icon={XCircle} variant="danger" />
-          </div>
-
-          {(uploadResult.duplicates?.fileDuplicateDetails?.length > 0 || uploadResult.duplicates?.dbDuplicateCodes?.length > 0) && (
-            <Card title="Collision Analysis" icon={AlertCircle}>
-              <div className="space-y-6">
-                {uploadResult.duplicates.fileDuplicateDetails?.length > 0 && (
-                  <div>
-                    <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Internal Manifest Conflict</h5>
-                    <div className="space-y-2">
-                      {uploadResult.duplicates.fileDuplicateDetails.map((dup, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100 text-xs">
-                          <code className="font-black text-amber-700">{dup.code}</code>
-                          <span className="text-amber-600 font-bold">Rows: {dup.rows.join(', ')}</span>
-                        </div>
-                      ))}
+        <div className="p-6">
+          {/* Upload Section */}
+          {!uploadResult && (
+            <div className="space-y-6">
+              {/* File Drop Zone */}
+              <div
+                className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
+                  dragActive
+                    ? 'border-indigo-400 bg-indigo-50'
+                    : file
+                    ? 'border-green-300 bg-green-50'
+                    : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
+                }`}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+              >
+                <input
+                  id="file-input"
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileInputChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={uploading}
+                />
+                
+                {file ? (
+                  <div className="space-y-4">
+                    <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto" />
+                    <div>
+                      <p className="text-lg font-medium text-green-700">{file.name}</p>
+                      <p className="text-sm text-gray-600">{formatFileSize(file.size)}</p>
+                    </div>
+                    <button
+                      onClick={removeFile}
+                      className="inline-flex items-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Upload className="w-16 h-16 text-gray-400 mx-auto" />
+                    <div>
+                      <p className="text-lg font-medium text-gray-700">
+                        Drop your file here or click to browse
+                      </p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Supports .xlsx, .xls, and .csv files up to 10MB
+                      </p>
                     </div>
                   </div>
                 )}
-                
-                {uploadResult.duplicates.dbDuplicateCodes?.length > 0 && (
+              </div>
+
+              {/* Expected Fields Info */}
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                <h3 className="font-medium text-indigo-900 mb-2">Expected File Format:</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                    <span className="text-indigo-700">ActivationCode</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-indigo-700">Plan</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <span className="text-indigo-700">Duration</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <span className="text-indigo-700">Vehicle</span>
+                  </div>
+                </div>
+                <p className="text-xs text-indigo-600 mt-2">
+                  For CSV: Use headers like "ActivationCode", "Activation Code", or "activation_code" (similar flexibility for other fields)
+                </p>
+              </div>
+
+              {/* Debug Info */}
+            
+
+              {/* Error Display */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
+                  <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
                   <div>
-                    <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Database Synchronization Conflict</h5>
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 overflow-hidden">
-                      <p className="text-[10px] font-bold text-slate-400 mb-2 italic">The following keys already exist in master registry:</p>
-                      <div className="font-mono text-[10px] text-slate-600 flex flex-wrap gap-2">
-                        {uploadResult.duplicates.dbDuplicateCodes.map((code, i) => (
-                          <span key={i} className="bg-white border border-slate-200 px-2 py-1 rounded-lg">{code}</span>
+                    <h4 className="font-medium text-red-900">Upload Error</h4>
+                    <p className="text-red-700 text-sm mt-1">{error}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Button */}
+              <div className="flex justify-center">
+                <button
+                  onClick={uploadFile}
+                  disabled={!file || uploading}
+                  className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-5 h-5 mr-2" />
+                      Upload & Import
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Success Results */}
+          {uploadResult && (
+            <div className="space-y-6">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-green-900 mb-2">Import Successful!</h3>
+                <p className="text-green-700">{uploadResult.message}</p>
+              </div>
+
+              {/* Import Statistics */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Import Statistics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <StatCard
+                    title="Total Rows"
+                    value={uploadResult.totalRows}
+                    icon={Database}
+                    color="text-blue-500"
+                  />
+                  <StatCard
+                    title="Imported"
+                    value={uploadResult.importedRows}
+                    icon={CheckCircle}
+                    color="text-green-500"
+                  />
+                  <StatCard
+                    title="File Duplicates"
+                    value={uploadResult.duplicates?.inFile || 0}
+                    icon={AlertCircle}
+                    color="text-yellow-500"
+                  />
+                  <StatCard
+                    title="DB Duplicates"
+                    value={uploadResult.duplicates?.inDatabase || 0}
+                    icon={XCircle}
+                    color="text-red-500"
+                  />
+                </div>
+              </div>
+
+              {/* Duplicate Details */}
+              {(uploadResult.duplicates?.fileDuplicateDetails?.length > 0 || uploadResult.duplicates?.dbDuplicateCodes?.length > 0) && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h4 className="font-medium text-yellow-900 mb-3">Duplicate Information</h4>
+                  
+                  {uploadResult.duplicates.fileDuplicateDetails?.length > 0 && (
+                    <div className="mb-4">
+                      <h5 className="font-medium text-yellow-800 mb-2">File Duplicates:</h5>
+                      <div className="text-sm text-yellow-700 space-y-1">
+                        {uploadResult.duplicates.fileDuplicateDetails.map((dup, index) => (
+                          <p key={index}>
+                            Code: <span className="font-mono">{dup.code}</span> appears on rows: {dup.rows.join(', ')}
+                          </p>
                         ))}
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-          )}
+                  )}
+                  
+                  {uploadResult.duplicates.dbDuplicateCodes?.length > 0 && (
+                    <div>
+                      <h5 className="font-medium text-yellow-800 mb-2">Database Duplicates:</h5>
+                      <div className="text-sm text-yellow-700">
+                        <p className="mb-1">The following codes already exist in the database:</p>
+                        <div className="font-mono text-xs bg-yellow-100 p-2 rounded max-h-32 overflow-y-auto">
+                          {uploadResult.duplicates.dbDuplicateCodes.join(', ')}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-          <div className="flex justify-center pt-8">
-            <Button variant="secondary" onClick={resetUpload} size="lg" icon={Upload}>
-              Ingest Alternate Manifest
-            </Button>
-          </div>
+              {/* Actions */}
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={resetUpload}
+                  className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  <Upload className="w-5 h-5 mr-2" />
+                  Upload Another File
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

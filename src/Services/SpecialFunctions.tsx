@@ -1,22 +1,9 @@
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { 
-  FileSearch, 
-  Download, 
-  Filter as FilterIcon, 
-  Mail, 
-  Car, 
-  Layout, 
-  Activity,
-  ArrowRight
-} from 'lucide-react';
+import HeaderAndValue from "../ReusedCompontets/HeaderAndValue"
 import { useNavigate } from 'react-router-dom';
-import HeaderAndValue from "../components/reusable/HeaderAndValue";
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Input from '../components/Input';
-import PageHeader from '../components/PageHeader';
-import Badge from '../components/Badge';
+
+
 
 interface SpecialFunctionItem {
   make: string;
@@ -52,7 +39,7 @@ interface Filters {
 }
 
 const ITEMS_PER_PAGE = 30;
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ;
 
 const SpecialFunctionsDetail = () => {
   const [functionsData, setFunctionsData] = useState<SpecialFunctionItem[]>([]);
@@ -75,7 +62,7 @@ const SpecialFunctionsDetail = () => {
   });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const navigate = useNavigate();
+   const navigate = useNavigate(); 
 
   const fetchData = async () => {
     try {
@@ -85,11 +72,11 @@ const SpecialFunctionsDetail = () => {
         limit: ITEMS_PER_PAGE.toString(),
         ...filters,
       });
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}api/SpecialFunctions?${params.toString()}`, {
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+         const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}api/SpecialFunctions?${params.toString()}`,{
+         headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ attach token
         },
       });
 
@@ -110,14 +97,25 @@ const SpecialFunctionsDetail = () => {
     }
   };
 
+  // Excel download function
   const downloadExcel = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({ ...filters });
+      
+      // Fetch all data without pagination
+      const params = new URLSearchParams({
+        ...filters,
+      });
+      
+      // Don't add page and limit to get all data
       const response = await fetch(`${API_BASE_URL}api/SpecialFunctions?${params.toString()}`);
+      
       if (!response.ok) throw new Error('Failed to fetch special functions data');
+      
       const json = await response.json();
+      
       if (json && Array.isArray(json.scans) && json.scans.length > 0) {
+        // Prepare data for Excel
         const excelData = json.scans.map((item: SpecialFunctionItem) => ({
           'Email': item.user_email,
           'Make': item.make,
@@ -133,10 +131,16 @@ const SpecialFunctionsDetail = () => {
           'Start Time': new Date(item.scan_start_time).toLocaleString(),
           'End Time': new Date(item.scan_end_time).toLocaleString()
         }));
+        
+        // Create workbook and worksheet
         const ws = XLSX.utils.json_to_sheet(excelData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Special Functions');
+        
+        // Generate filename
         const filename = `Special_Functions_${filters.make || 'All'}_${filters.email || 'All'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        // Download file
         XLSX.writeFile(wb, filename);
       } else {
         alert('No data available to download');
@@ -159,224 +163,221 @@ const SpecialFunctionsDetail = () => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Generate page numbers to show
   const generatePageNumbers = () => {
     const pages = [];
     const maxVisiblePages = 5;
+    
     let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2));
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    // Adjust start page if we're near the end
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    
     return pages;
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn">
-      <PageHeader 
-        title="Special Functions Registry" 
-        subtitle="Manage and analyze special diagnostic function executions."
-        icon={Activity}
-        action={
-          <Button 
-            variant="outline" 
-            onClick={downloadExcel} 
-            disabled={loading || functionsData.length === 0}
-            icon={Download}
-          >
-            Export Sheet
-          </Button>
-        }
-      />
+    <div className="p-4 ml-8">
+      <h2 className="text-xl font-bold mb-4">Special Functions</h2>
+      {error && <p className="text-red-500">{error}</p>}
 
-      {/* Filters Section */}
-      <Card title="Query Parameters" subtitle="Filter functional scan records" icon={FilterIcon}>
+      {/* Filters Section and Excel Download Button */}
+      <div className="flex flex-col gap-4 mb-6">
+        {/* Filters row */}
+      
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPage(1);
-            fetchData();
-          }}
-          className="space-y-6"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Input 
-              label="User Email" 
-              placeholder="user@example.com"
-              value={filters.email}
-              onChange={(e) => handleFilterChange('email', e.target.value)}
-              icon={Mail}
-            />
-            <Input 
-              label="Vehicle Make" 
-              placeholder="e.g. BMW, Audi"
-              value={filters.make}
-              onChange={(e) => handleFilterChange('make', e.target.value)}
-              icon={Car}
-            />
-            <Input 
-              label="Model" 
-              placeholder="e.g. A4, X5"
-              value={filters.model}
-              onChange={(e) => handleFilterChange('model', e.target.value)}
-              icon={Layout}
-            />
-            <div className="flex flex-col">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Start Date</label>
-              <input 
-                type="date"
-                className="premium-input w-full"
-                value={filters.scan_start_time}
-                onChange={(e) => handleFilterChange('scan_start_time', e.target.value)}
-              />
-            </div>
-          </div>
-          
-          <div className="flex justify-end pt-2">
-            <Button type="submit" variant="primary" className="px-10 h-12" isLoading={loading}>
-              Execute Filter
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      {/* Table Section */}
-      <Card noPadding title="Special Function Executions" headerAction={<Badge variant="secondary">Total: {total}</Badge>}>
-        {loading ? (
-          <div className="p-24 text-center">
-            <div className="animate-spin h-12 w-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-6"></div>
-            <p className="text-slate-400 font-medium tracking-wide">Retrieving functional records...</p>
-          </div>
-        ) : error ? (
-          <div className="p-24 text-center">
-            <Badge variant="danger" className="mb-4">System Error</Badge>
-            <p className="text-slate-500 font-semibold">{error}</p>
-          </div>
-        ) : functionsData.length === 0 ? (
-          <div className="p-24 text-center">
-            <FileSearch className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-            <p className="text-slate-400 font-medium tracking-wide">No functional records found matching current filters.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto overflow-y-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-100">
-                  <HeaderAndValue header={true} Title="User Identity" />
-                  <HeaderAndValue header={true} Title="Make" />
-                  <HeaderAndValue header={true} Title="Module" />
-                  <HeaderAndValue header={true} Title="Model" />
-                  <HeaderAndValue header={true} Title="Function" />
-                  <HeaderAndValue header={true} Title="Command" />
-                  <HeaderAndValue header={true} Title="Item No" />
-                  <HeaderAndValue header={true} Title="Variant" />
-                  <HeaderAndValue header={true} Title="Plate" />
-                  <HeaderAndValue header={true} Title="Status" />
-                  <HeaderAndValue header={true} Title="Start Time" />
-                  <HeaderAndValue header={true} Title="Actions" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {functionsData.map((item, index) => (
-                  <tr key={index} className="hover:bg-primary-50/30 transition-all duration-200 group">
-                    <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-700">{item.user_email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-medium">{item.make}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant="secondary">{item.module}</Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-600">{item.model}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-600">{item.function_type}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <code className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-600 font-mono">{item.command_type}</code>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-400 text-xs">#{item.item_number}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-500 text-xs">{item.variant}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-mono bg-amber-50 text-amber-700 px-2 py-1 rounded border border-amber-100 text-xs font-black uppercase">{item.license_plate}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={item.scan_ended === 'true' ? 'success' : 'warning'}>
-                        {item.scan_ended === 'true' ? 'Completed' : 'Pending'}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-400 text-xs">
-                      {new Date(item.scan_start_time).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Button 
-                        variant="primary" 
-                        size="sm" 
-                        icon={ArrowRight} 
-                        iconPosition="right"
-                        onClick={() =>
-                          navigate("/SpecialFunctions/details", {
-                            state: {
-                              ScanArray: item.scanResArray,
-                              start_time: item.scan_start_time,
-                              end_time: item.scan_end_time,
-                              email: item.user_email,
-                              make: item.make,
-                            },
-                          })
-                        }
-                      >
-                        Details
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination Section */}
-        {totalPages > 1 && (
-          <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-slate-500 font-medium">
-              Showing page <span className="text-slate-900 font-black">{page}</span> of <span className="text-slate-900 font-black">{totalPages || 1}</span>
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                className="px-4 py-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition disabled:opacity-30 disabled:pointer-events-none"
-                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                disabled={page === 1}
-              >
-                Previous
-              </button>
-
-              {generatePageNumbers().map((pageNum) => (
-                <button
-                  key={pageNum}
-                  className={`w-10 h-10 rounded-xl font-black transition-all ${
-                    page === pageNum
-                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-200'
-                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-                  }`}
-                  onClick={() => setPage(pageNum)}
-                >
-                  {pageNum}
-                </button>
+            onSubmit={(e) => {
+              e.preventDefault(); // stop page reload
+              setPage(1);
+              fetchData();
+            }}
+          >
+            <div className="flex flex-wrap gap-4">
+              {Object.keys(filters).map((key) => (
+                <div key={key} className="flex flex-col w-52">
+                  <label className="mb-1 font-semibold capitalize">
+                    {key.replace(/_/g, " ")}
+                  </label>
+                  <input
+                    type={
+                      key.includes("time")
+                        ? "date"
+                        : key === "hard_coded"
+                        ? "checkbox"
+                        : "text"
+                    }
+                    placeholder={key.replace(/_/g, " ")}
+                    className="border border-gray-300 px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={
+                      key === "hard_coded"
+                        ? undefined
+                        : filters[key as keyof Filters]
+                    }
+                    checked={
+                      key === "hard_coded"
+                        ? filters[key as keyof Filters] === "true"
+                        : undefined
+                    }
+                    onChange={(e) =>
+                      handleFilterChange(
+                        key as keyof Filters,
+                        key === "hard_coded"
+                          ? (e.target as HTMLInputElement).checked.toString()
+                          : e.target.value
+                      )
+                    }
+                  />
+                </div>
               ))}
 
               <button
-                className="px-4 py-2 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition disabled:opacity-30 disabled:pointer-events-none"
-                onClick={() => setPage((prev) => Math.min(prev + 1, totalPages || 1))}
-                disabled={page === (totalPages || 1)}
+                type="submit" // ✅ Enter key now triggers filter
+                className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition-all self-end"
               >
-                Next
+                Filter
               </button>
             </div>
-          </div>
-        )}
-      </Card>
-      
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fadeIn { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-      `}</style>
+          </form>
+
+        
+        {/* Excel Download Button */}
+        <div className="flex justify-end">
+          <button
+            onClick={downloadExcel}
+            disabled={loading || functionsData.length === 0}
+            className="bg-blue-300 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M3 17a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zM3.293 7.707A1 1 0 014 7h3V3a1 1 0 011-1h4a1 1 0 011 1v4h3a1 1 0 01.707 1.707l-7 7a1 1 0 01-1.414 0l-7-7z"/>
+            </svg>
+            Download Excel
+          </button>
+        </div>
+      </div>
+
+      {loading && <p className="text-blue-500">Loading...</p>}
+
+      {/* Table */}
+      <table className="min-w-full bg-white border border-gray-200 text-sm">
+        <thead>
+          <tr>
+            <HeaderAndValue header={true} Title="Email" />
+            <HeaderAndValue header={true} Title="Make" />
+            <HeaderAndValue header={true} Title="Module" />
+            <HeaderAndValue header={true} Title="Model" />
+            <HeaderAndValue header={true} Title="Function Type" />
+            <HeaderAndValue header={true} Title="Command Type" />
+            <HeaderAndValue header={true} Title="Item Number" />
+            <HeaderAndValue header={true} Title="Variant" />
+            <HeaderAndValue header={true} Title="License Plate" />
+            <HeaderAndValue header={true} Title="Scan Ended" />
+            <HeaderAndValue header={true} Title="Hard Coded" />
+            <HeaderAndValue header={true} Title="Start Time" />
+            <HeaderAndValue header={true} Title="End Time" />
+            <HeaderAndValue header={true} Title="Show" />
+          </tr>
+        </thead>
+        <tbody>
+          {functionsData.map((item, index) => (
+            <tr key={index}>
+              <HeaderAndValue Title={item.user_email} />
+              <HeaderAndValue Title={item.make} />
+              <HeaderAndValue Title={item.module} />
+              <HeaderAndValue Title={item.model} />
+              <HeaderAndValue Title={item.function_type} />
+              <HeaderAndValue Title={item.command_type} />
+              <HeaderAndValue Title={item.item_number} />
+              <HeaderAndValue Title={item.variant} />
+              <HeaderAndValue Title={item.license_plate} />
+              <HeaderAndValue Title={item.scan_ended} />
+              <HeaderAndValue Title={item.hard_coded ? 'Yes' : 'No'} />
+              <HeaderAndValue Title={new Date(item.scan_start_time).toLocaleString()} />
+              <HeaderAndValue Title={new Date(item.scan_end_time).toLocaleString()} />
+              <td className="border px-4 py-2">
+                {/* <button
+                  onClick={() => {
+                    // Mock navigation - in real app use navigate
+                    console.log('Navigate to details with function data:', item);
+                  }}
+                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                >
+                  View Details
+                </button> */}
+
+
+
+                <button
+                  onClick={() =>
+                    navigate("/SpecialFunctions/details", {
+                      state: {
+                        ScanArray: item.scanResArray,   // or whatever field holds your scan array
+                        start_time: item.scan_start_time,
+                        end_time: item.scan_end_time,
+                        email: item.user_email,
+                        make: item.make,
+                      },
+                    })
+                  }
+                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                >
+                  View Details
+                </button>
+
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* ✅ New Pagination Design */}
+      <div className="mt-6 flex flex-col items-center space-y-4">
+        {/* Pagination buttons */}
+        <div className="flex items-center space-x-1">
+          <button
+            className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+            disabled={page === 1}
+          >
+            Previous
+          </button>
+
+          {totalPages > 0 && generatePageNumbers().map((pageNum) => (
+            <button
+              key={pageNum}
+              className={`w-10 h-10 rounded-md font-medium transition-colors ${
+                page === pageNum
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+              onClick={() => setPage(pageNum)}
+            >
+              {pageNum}
+            </button>
+          ))}
+
+          <button
+            className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => setPage((prev) => Math.min(prev + 1, totalPages || 1))}
+            disabled={page === (totalPages || 1)}
+          >
+            Next
+          </button>
+        </div>
+
+        {/* Showing results text */}
+        <p className="text-gray-600 text-sm">
+          Showing page {page} of {totalPages || 1} ({total} total items)
+        </p>
+      </div>
     </div>
   );
 };
 
-export default SpecialFunctionsDetail;
+export default SpecialFunctionsDetail;

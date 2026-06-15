@@ -1,22 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { 
-  Users, 
-  Search, 
-  Download, 
-  ChevronLeft, 
-  ChevronRight,
-  Mail,
-  Shield,
-  Activity,
-  AlertCircle,
-  RefreshCw
-} from 'lucide-react';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Input from '../components/Input';
-import PageHeader from '../components/PageHeader';
-import Badge from '../components/Badge';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -49,52 +32,71 @@ const UsersTable: React.FC = () => {
       if (filters.email) params.append('email', filters.email);
       if (filters.plan) params.append('plan', filters.plan);
       if (filters.status) params.append('status', filters.status);
-      
+
+     
       params.append('page', page.toString());
       params.append('limit', ITEMS_PER_PAGE.toString());
 
-      const token = localStorage.getItem("token");
+       const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE_URL}api/users?${params.toString()}`,{
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
+         headers: {
+        "Content-Type": "application/json",
+        ...(token ? { authorization: `Bearer ${token}` } : {}), // ✅ attach token
         },
       });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const data = await response.json();
       setUsers(data.users || []);
       setTotal(data.total || 0); 
     } catch (err) {
-      setError("Failed to synchronize user registry.");
+      console.error('Fetch error:', err);
+      setError("Failed to fetch users");
     } finally {
       setLoading(false);
     }
   };
 
+  // Excel download function
   const downloadExcel = async () => {
     try {
       setLoading(true);
+      
+      // Fetch all data without pagination
       const params = new URLSearchParams();
       if (filters.email) params.append('email', filters.email);
       if (filters.plan) params.append('plan', filters.plan);
       if (filters.status) params.append('status', filters.status);
       
+      // Don't add page and limit to get all data
       const response = await fetch(`${API_BASE_URL}api/users?${params.toString()}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
       
       if (data.users && data.users.length > 0) {
+        // Create workbook and worksheet
         const ws = XLSX.utils.json_to_sheet(data.users);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Users');
-        const filename = `UserRegistry_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        // Generate filename
+        const filename = `Users_${filters.email || 'All'}_${filters.plan || 'All'}_${filters.status || 'All'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        // Download file
         XLSX.writeFile(wb, filename);
+      } else {
+        alert('No data available to download');
       }
     } catch (err) {
-      alert('Failed to generate export manifest');
+      console.error('Error downloading Excel:', err);
+      alert('Failed to download Excel file');
     } finally {
       setLoading(false);
     }
@@ -102,177 +104,201 @@ const UsersTable: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [page]);
+  }, [page]); // ✅ page बदलते ही API call होगी
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
-  const getVisiblePages = () => {
+  // Generate page numbers to show
+  const generatePageNumbers = () => {
     const pages = [];
-    const maxVisible = 5;
-    let start = Math.max(1, page - 2);
-    let end = Math.min(totalPages, start + maxVisible - 1);
-    if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
-    for (let i = start; i <= end; i++) pages.push(i);
+    const maxVisiblePages = 5;
+    
+    let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    // Adjust start page if we're near the end
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    
     return pages;
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
-      <PageHeader 
-        title="User Master Registry" 
-        subtitle="Comprehensive management of system participants, subscription tiers, and access states"
-        icon={Users}
-        action={
-          <Button 
-            variant="outline" 
-            onClick={downloadExcel} 
-            disabled={loading || users.length === 0}
-            icon={Download}
-          >
-            Export Master
-          </Button>
-        }
-      />
+    <div className="flex min-h-screen bg-gray">
+      <div className="flex-1 p-8">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6 ml-6">User List</h2>
 
-      <div className="space-y-8">
-        <Card title="Query Parameters" icon={Search} subtitle="Filter participants by identity and status">
+        {/* Filters and Buttons */}
+        <div className="flex flex-col gap-4 mb-6">
+          {/* Filters row */}
+          {/* <div className="flex flex-wrap gap-4">
+            <input
+              type="text"
+              placeholder="Email"
+              className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={filters.email}
+              onChange={(e) => setFilters({ ...filters, email: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Plan"
+              className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={filters.plan}
+              onChange={(e) => setFilters({ ...filters, plan: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Status"
+              className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={filters.status}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            />
+            <button
+              onClick={() => { setPage(1); fetchUsers(); }}
+              className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition-all"
+            >
+              Filter
+            </button>
+          </div> */}
+
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setPage(1);
-              fetchUsers();
-            }}
-            className="space-y-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setPage(1);
+            fetchUsers();
+          }}
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Input 
-                label="Email Identity" 
-                placeholder="user@example.com"
-                value={filters.email}
-                onChange={(e) => setFilters(prev => ({ ...prev, email: e.target.value }))}
-                icon={Mail}
-              />
-              <Input 
-                label="Subscription Plan" 
-                placeholder="e.g. Premium"
-                value={filters.plan}
-                onChange={(e) => setFilters(prev => ({ ...prev, plan: e.target.value }))}
-                icon={Shield}
-              />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Account Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                  className="h-11 w-full bg-slate-50 border-none rounded-xl px-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-primary-500/20 transition-all appearance-none cursor-pointer"
-                >
-                  <option value="">All States</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-            
-            <div className="flex justify-end pt-2">
-              <Button type="submit" variant="primary" className="px-10 h-11" isLoading={loading} icon={Search}>
-                Execute Filter
-              </Button>
-            </div>
-          </form>
-        </Card>
+        <div className="flex flex-wrap gap-4">
+          <input
+            type="text"
+            placeholder="Email"
+            className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={filters.email}
+            onChange={(e) => setFilters({ ...filters, email: e.target.value })}
+          />
+          <input
+            type="text"
+            placeholder="Plan"
+            className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={filters.plan}
+            onChange={(e) => setFilters({ ...filters, plan: e.target.value })}
+          />
+          <input
+            type="text"
+            placeholder="Status"
+            className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+          />
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition-all"
+          >
+            Filter
+          </button>
+        </div>
+      </form>
 
-        <Card noPadding title="Active Participants" icon={Activity} headerAction={<Badge variant="secondary">{total} Total Records</Badge>}>
+          
+          {/* Excel Download Button */}
+          <div className="flex">
+            <button
+              onClick={downloadExcel}
+              disabled={loading || users.length === 0}
+              className="bg-blue-300 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition flex items-center gap-2">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M3 17a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zM3.293 7.707A1 1 0 014 7h3V3a1 1 0 011-1h4a1 1 0 011 1v4h3a1 1 0 01.707 1.707l-7 7a1 1 0 01-1.414 0l-7-7z"/>
+              </svg>
+              Download Excel
+            </button>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
           {loading ? (
-            <div className="p-24 text-center">
-              <div className="animate-spin h-12 w-12 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-6"></div>
-              <p className="text-slate-400 font-black italic tracking-widest animate-pulse">Synchronizing user registry...</p>
-            </div>
+            <p className="p-4 text-gray-500">Loading...</p>
           ) : error ? (
-            <div className="p-24 text-center animate-fadeIn">
-              <AlertCircle className="w-16 h-16 text-rose-300 mx-auto mb-6" />
-              <p className="text-slate-700 font-black text-xl mb-2 italic">Registry Access Failure</p>
-              <p className="text-slate-400 max-w-sm mx-auto mb-8 font-bold text-sm tracking-tight">{error}</p>
-              <Button variant="primary" className="h-11 px-8 shadow-lg shadow-primary-100" onClick={fetchUsers} icon={RefreshCw}>Reconnect Registry</Button>
-            </div>
+            <p className="p-4 text-red-500">{error}</p>
           ) : users.length === 0 ? (
-            <div className="p-24 text-center italic">
-              <Users className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-              <p className="text-slate-400 font-black tracking-widest text-xs uppercase">No system participants identified</p>
-            </div>
+            <p className="p-4 text-gray-500">No users found.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    {Object.keys(users[0]).map((key) => (
-                      <th key={key} className="px-6 py-5 font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
-                        {key.replace(/_/g, ' ')}
-                      </th>
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-gray-100">
+                <tr>
+                  {Object.keys(users[0]).map((key) => (
+                    <th
+                      key={key}
+                      className="px-4 py-2 text-left text-gray-700 font-medium border-b border-gray-300 whitespace-nowrap"
+                    >
+                      {key}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    {Object.values(user).map((val, i) => (
+                      <td
+                        key={i}
+                        className="px-4 py-2 border-b border-gray-200 text-gray-800 whitespace-nowrap"
+                      >
+                        {val === null || val === undefined ? '-' : String(val)}
+                      </td>
                     ))}
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {users.map((user, idx) => (
-                    <tr key={idx} className="hover:bg-primary-50/30 transition-colors group">
-                      {Object.values(user).map((val, i) => (
-                        <td key={i} className="px-6 py-4 whitespace-nowrap font-bold text-slate-600">
-                          {val === null || val === undefined ? (
-                            <span className="text-slate-300">-</span>
-                          ) : typeof val === 'boolean' ? (
-                            <Badge variant={val ? 'success' : 'secondary'}>{val ? 'TRUE' : 'FALSE'}</Badge>
-                          ) : i === 0 ? (
-                              <code className="bg-slate-50 text-slate-400 px-2 py-0.5 rounded font-mono">{String(val)}</code>
-                          ) : (
-                            String(val)
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           )}
+        </div>
 
-          {totalPages > 1 && (
-            <div className="p-6 bg-slate-50/30 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Manifest Fragment <span className="text-primary-600">{page}</span> of <span className="text-slate-900">{totalPages}</span>
-              </p>
-              <div className="flex items-center gap-1.5">
-                <button
-                  className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
-                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={page === 1}
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <div className="flex gap-2 mx-4">
-                  {getVisiblePages().map((pageNum) => (
-                    <button
-                      key={pageNum}
-                      className={`w-9 h-9 rounded-xl text-[11px] font-black transition-all ${
-                        page === pageNum
-                          ? 'bg-primary-600 text-white shadow-lg shadow-primary-100'
-                          : 'bg-white text-slate-500 hover:bg-primary-50 border border-slate-100'
-                      }`}
-                      onClick={() => setPage(pageNum)}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
-                  onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-                  disabled={page === totalPages}
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            </div>
-          )}
-        </Card>
+        {/* ✅ New Pagination Design */}
+        <div className="mt-6 flex flex-col items-center space-y-4">
+          {/* Pagination buttons */}
+          <div className="flex items-center space-x-1">
+            <button
+              className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </button>
+
+            {generatePageNumbers().map((pageNum) => (
+              <button
+                key={pageNum}
+                className={`w-10 h-10 rounded-md font-medium transition-colors ${
+                  page === pageNum
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+                onClick={() => setPage(pageNum)}
+              >
+                {pageNum}
+              </button>
+            ))}
+
+            <button
+              className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={page === totalPages}
+            >
+              Next
+            </button>
+          </div>
+
+          {/* Showing results text */}
+          <p className="text-gray-600 text-sm">
+            Showing page {page} of {totalPages || 1} ({total} total items)
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,25 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { 
-  FileSearch, 
-  Download, 
-  Mail, 
-  Hash, 
-  Activity,
-  ArrowRight,
-  Database,
-  Search,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
+import HeaderAndValue from "../ReusedCompontets/HeaderAndValue"
 import { useNavigate } from "react-router-dom";
-
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Input from '../components/Input';
-import PageHeader from '../components/PageHeader';
-import Badge from '../components/Badge';
 
 interface DecodedArrayItem {
   pid: string;
@@ -39,97 +21,153 @@ interface ScanResItem {
   system: string;
 }
 
-interface ScanData {
-  _id: string;
-  user_email: string;
+interface ScanItem {
+  id: number;
+  scan_id : number;
+  email: string;
+  model: string;
+  vin: string;
   license_plate: string;
+  scan_ended: string;
+  make: string;
+  function: string;
+  type: string;
+  country_id: number;
+  scan_end_time: string;
+  scan_start_time: string;
+  app_version: string;
+  pdf_report: string;
+  scanResArray: ScanResItem[] | null;
+  decodedArray: DecodedArrayItem[] | null;
+}
+
+interface Filters {
+  email: string;
+  make: string;
+  model: string;
+  license_plate: string;
+  country_id: string;
   scan_start_time: string;
   scan_end_time: string;
-  App_version: string;
-  scan_ended: string;
-  functiones: string;
   type: string;
-  ScanArray: ScanResItem[];
-  DecodeArray: DecodedArrayItem[];
+  app_version: string;
 }
 
 const ITEMS_PER_PAGE = 30;
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ;
 
-const ObdScanReport = () => {
-  const [scanData, setScanData] = useState<ScanData[]>([]);
+const Scandetail = () => {
+  const [scans, setScans] = useState<ScanItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<Filters>({
     email: '',
+    make: '',
+    model: '',
     license_plate: '',
+    country_id: '',
+    scan_start_time: '',
+    scan_end_time: '',
+    type: '',
+    app_version: '',
   });
-  const [page, setPage] = useState(1);
+  
+  // Initialize page from sessionStorage
+  const [page, setPage] = useState(() => {
+    const savedPage = sessionStorage.getItem('scanDetailPage');
+    return savedPage ? parseInt(savedPage, 10) : 1;
+  });
+  
   const [total, setTotal] = useState(0);
-  const navigate = useNavigate();
+
+  const navigate = useNavigate(); 
+
+  // Save page to sessionStorage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('scanDetailPage', page.toString());
+  }, [page]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      setError(null);
       const params = new URLSearchParams({
         page: page.toString(),
         limit: ITEMS_PER_PAGE.toString(),
-        email: filters.email,
-        license_plate: filters.license_plate,
+        ...filters,
       });
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}api/ObdScanReport?${params.toString()}`, {
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const token =  localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}api/ScanDetail?${params.toString()}`,{
+         headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
-      if (!response.ok) throw new Error('Failed to fetch scan report data');
+      if (!response.ok) throw new Error('Failed to fetch scan report');
 
       const json = await response.json();
       if (json && Array.isArray(json.scans)) {
-        setScanData(json.scans);
+        setScans(json.scans);
         setTotal(json.total || 0);
+        
+        // Cache the data in sessionStorage
+        sessionStorage.setItem('scanDetailCache', JSON.stringify({
+          scans: json.scans,
+          total: json.total || 0,
+          page: page,
+          filters: filters,
+          timestamp: Date.now()
+        }));
+        console.log('💾 Cached scan data');
       } else {
         setError('Invalid response format');
       }
     } catch (err) {
       console.error('Fetch error:', err);
-      setError('Connection to diagnostic database failed. Please try again.');
+      setError('Something went wrong');
     } finally {
       setLoading(false);
     }
   };
 
+  // Excel download function
   const downloadExcel = async () => {
     try {
       setLoading(true);
+      
       const params = new URLSearchParams({
-        email: filters.email,
-        license_plate: filters.license_plate,
+        ...filters,
       });
-      const response = await fetch(`${API_BASE_URL}api/ObdScanReport?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch scan report data');
+      
+      const response = await fetch(`${API_BASE_URL}api/ScanDetail?${params.toString()}`);
+      
+      if (!response.ok) throw new Error('Failed to fetch scan report');
+      
       const json = await response.json();
+      
       if (json && Array.isArray(json.scans) && json.scans.length > 0) {
-        const excelData = json.scans.map((item: ScanData) => ({
-          'Email': item.user_email,
-          'License Plate': item.license_plate,
-          'Start Time': new Date(item.scan_start_time).toLocaleString(),
-          'End Time': new Date(item.scan_end_time).toLocaleString(),
-          'App Version': item.App_version,
-          'Status': item.scan_ended === 'true' ? 'Completed' : 'Pending',
-          'Function': item.functiones,
-          'Type': item.type,
-          'Scan Results Count': item.ScanArray?.length || 0,
-          'Faults Found': item.DecodeArray?.length || 0
+        const excelData = json.scans.map((scan: ScanItem) => ({
+          'Email': scan.email,
+          'Start Time': new Date(scan.scan_start_time).toLocaleString(),
+          'End Time': new Date(scan.scan_end_time).toLocaleString(),
+          'Model': scan.model,
+          'License Plate': scan.license_plate,
+          'VIN': scan.vin,
+          'Scan Ended': scan.scan_ended,
+          'Make': scan.make,
+          'Country': scan.country_id,
+          'Function': scan.function,
+          'Type': scan.type,
+          'App Version': scan.app_version,
+          'PDF Report': scan.pdf_report || 'No Report'
         }));
+        
         const ws = XLSX.utils.json_to_sheet(excelData);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Scan Reports');
-        const filename = `Scan_Reports_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.utils.book_append_sheet(wb, ws, 'Scan Details');
+        
+        const filename = `Scan_Details_${filters.make || 'All'}_${filters.email || 'All'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
         XLSX.writeFile(wb, filename);
       } else {
         alert('No data available to download');
@@ -146,215 +184,338 @@ const ObdScanReport = () => {
     fetchData();
   }, [page]);
 
+  // ✅ Restore scroll position after data loads
+  useEffect(() => {
+    if (!loading && scans.length > 0) {
+      // Check if we're returning from details page
+      const returningFromDetails = sessionStorage.getItem('returningToScanPage');
+      
+      // Use a unique key for this page
+      const savedScrollPosition = sessionStorage.getItem('scanDetailPage_ScrollPosition');
+      console.log('Raw saved position from storage:', savedScrollPosition);
+      console.log('Returning from details?', returningFromDetails);
+      
+      if (returningFromDetails === 'true') {
+        
+        if (savedScrollPosition && savedScrollPosition !== '0') {
+          const scrollPos = parseInt(savedScrollPosition, 10);
+          console.log('🎯 Restoring scroll position:', scrollPos);
+          
+          if (scrollPos > 0) {
+            // Multiple attempts to ensure scroll happens
+            const scrollAttempts = [0, 50, 100, 200, 300, 400, 500];
+            scrollAttempts.forEach(delay => {
+              setTimeout(() => {
+                window.scrollTo(0, scrollPos);
+                console.log('Scrolled at', delay, 'ms, current position:', window.scrollY);
+              }, delay);
+            });
+            
+            // Clear the flag after restoration is complete
+            setTimeout(() => {
+              sessionStorage.removeItem('returningToScanPage');
+              console.log('✅ Cleared returningToScanPage flag after restoration');
+            }, 600);
+          }
+        } else {
+          sessionStorage.removeItem('returningToScanPage');
+        }
+      } else {
+        console.log('Not returning from details - starting at top');
+      }
+    }
+  }, [loading, scans]);
+
+
+  
+  // ✅ Save scroll position on scroll
+  useEffect(() => {
+    // let timeoutId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    // let hasRestoredScroll = false;
+    
+    // Mark that this component is active
+    sessionStorage.setItem('activePage', 'scanDetailPage');
+    
+    // Check if we're returning from details page
+    const returningFromDetails = sessionStorage.getItem('returningToScanPage');
+    if (returningFromDetails === 'true') {
+      // hasRestoredScroll = false; // Will be set to true after restoration
+      console.log('🔄 Component mounted - returning from details, will restore scroll');
+    }
+    
+    const handleScroll = () => {
+      // Debounce scroll saves
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const scrollPos = window.scrollY;
+        const activePage = sessionStorage.getItem('activePage');
+        const stillReturning = sessionStorage.getItem('returningToScanPage');
+        
+        // Don't save if:
+        // 1. This page is not active
+        // 2. We're still in the process of returning from details (within first 500ms)
+        // 3. We're loading data
+        if (activePage === 'scanDetailPage' && stillReturning !== 'true' && !loading) {
+          sessionStorage.setItem('scanDetailPage_ScrollPosition', scrollPos.toString());
+          console.log('ScanDetail Auto-saved scroll position:', scrollPos);
+        } else {
+          console.log('Skipping auto-save - returning from details or loading:', { stillReturning, loading });
+        }
+      }, 100);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('scroll', handleScroll);
+      
+      // Check BOTH flags - navigating to details OR returning from details
+      const navigatingToDetails = sessionStorage.getItem('navigatingToDetails');
+      const returningFromDetails = sessionStorage.getItem('returningToScanPage');
+      
+      console.log('Unmount - navigatingToDetails flag:', navigatingToDetails);
+      console.log('Unmount - returningToScanPage flag:', returningFromDetails);
+      
+      if (navigatingToDetails === 'true' || returningFromDetails === 'true') {
+        console.log('✅ Skipping unmount save - preserving position');
+      } else {
+        // Only save if genuinely leaving the scan detail page
+        const finalScrollPos = window.scrollY;
+        console.log('💾 Saving on unmount (leaving page):', finalScrollPos);
+        if (finalScrollPos > 0) {
+          sessionStorage.setItem('scanDetailPage_ScrollPosition', finalScrollPos.toString());
+        }
+      }
+    };
+  }, [loading]);
+
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
-  const handleFilterChange = (field: string, value: string) => {
+  const handleFilterChange = (field: keyof Filters, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
   const generatePageNumbers = () => {
     const pages = [];
     const maxVisiblePages = 5;
+    
     let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2));
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    
     return pages;
   };
 
-  return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
-      <PageHeader 
-        title="OBD Diagnostic Reports" 
-        subtitle="Vew and analyze historical vehicle scan data across your network"
-        icon={Database}
-        action={
-          <Button 
-            variant="outline" 
-            onClick={downloadExcel} 
-            disabled={loading || scanData.length === 0}
-            icon={Download}
-          >
-            Export Manifest
-          </Button>
-        }
-      />
+  // ✅ Handle navigation and save scroll
+  const handleViewDetails = (scan: ScanItem) => {
+    // Mark that we're navigating to details page
+    sessionStorage.setItem('navigatingToDetails', 'true');
+    sessionStorage.setItem('activePage', 'detailsPage');
+    
+    // Save current scroll position with unique key for this page
+    const currentScroll = window.scrollY;
+    sessionStorage.setItem('scanDetailPage_ScrollPosition', currentScroll.toString());
+    console.log('Saving scroll position on button click:', currentScroll);
+    
+    // Verify it was saved
+    setTimeout(() => {
+      const verification = sessionStorage.getItem('scanDetailPage_ScrollPosition');
+      console.log('Verification - position in storage:', verification);
+    }, 10);
+    
+    navigate(`/ObdScanReport/details/${scan.id}`, {
+    // navigate(`/ObdScanReport/details`, {
+      state: {
+        ScanArray: scan.scanResArray,
+        DecodeArray: scan.decodedArray,
+        start_time: scan.scan_start_time,
+        end_time: scan.scan_end_time,
+        license_plate: scan.license_plate,
+        email: scan.email,
+        App_version: scan.app_version,
+        scan_ended: scan.scan_ended,
+        functiones: scan.function,
+        type: scan.type,
+        bluetooth_device: scan.bluetooth_device,
+      },
+    });
+  };
 
-      <div className="space-y-8">
-        <Card title="Database Query" subtitle="Filter diagnostic records by identity or vehicle plate" icon={Search}>
-          <form
+  return (
+    <div className="p-4 ml-8">
+      <h2 className="text-xl font-bold mb-4">Scan Details</h2>
+      {error && <p className="text-red-500">{error}</p>}
+
+      <div className="flex flex-col gap-4 mb-6">
+        <form
             onSubmit={(e) => {
               e.preventDefault();
               setPage(1);
+              sessionStorage.removeItem('scanDetailPage_ScrollPosition');
               fetchData();
             }}
-            className="flex flex-col md:flex-row items-end gap-6"
           >
-            <div className="flex-1 w-full">
-              <Input 
-                label="Account Email" 
-                placeholder="user@example.com"
-                value={filters.email}
-                onChange={(e) => handleFilterChange('email', e.target.value)}
-                icon={Mail}
-              />
+            <div className="flex flex-wrap gap-4">
+              {Object.keys(filters).map((key) => (
+                <input
+                  key={`filter-${key}`}
+                  type={
+                    key.includes("time")
+                      ? "date"
+                      : key === "country_id"
+                      ? "number"
+                      : "text"
+                  }
+                  placeholder={key}
+                  className="border border-gray-300 px-4 py-2 rounded-md w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters[key as keyof Filters]}
+                  onChange={(e) =>
+                    handleFilterChange(key as keyof Filters, e.target.value)
+                  }
+                />
+              ))}
+
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 transition-all"
+              >
+                Filter
+              </button>
             </div>
-            <div className="flex-1 w-full">
-              <Input 
-                label="License Plate" 
-                placeholder="e.g. MH12AB1234"
-                value={filters.license_plate}
-                onChange={(e) => handleFilterChange('license_plate', e.target.value)}
-                icon={Hash}
-              />
-            </div>
-            
-            <Button type="submit" variant="primary" className="px-10 h-11" isLoading={loading} icon={Search}>
-              Execute Filter
-            </Button>
           </form>
-        </Card>
 
-        <Card noPadding title="Diagnostic History" icon={Activity} headerAction={<Badge variant="secondary">{total} Total Records</Badge>}>
-          {loading ? (
-            <div className="p-32 text-center">
-              <div className="animate-spin h-14 w-14 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-6 shadow-sm"></div>
-              <p className="text-slate-400 font-black italic tracking-widest animate-pulse uppercase text-xs">Synchronizing diagnostic server...</p>
-            </div>
-          ) : error ? (
-            <div className="p-24 text-center animate-fadeIn">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-rose-50 text-rose-500 rounded-[28px] mb-6 shadow-sm border border-rose-100/50">
-                <Activity size={32} />
-              </div>
-              <p className="text-slate-700 font-black text-xl mb-2 italic">Connection Infrastructure Failure</p>
-              <p className="text-slate-400 max-w-sm mx-auto mb-8 font-bold text-sm tracking-tight">{error}</p>
-              <Button variant="primary" className="h-11 px-8 shadow-lg shadow-primary-200" onClick={fetchData} icon={RefreshCw}>Reconnect Database</Button>
-            </div>
-          ) : scanData.length === 0 ? (
-            <div className="p-32 text-center italic animate-fadeIn">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-50 text-slate-200 rounded-[28px] mb-6 border border-slate-100">
-                <FileSearch size={32} />
-              </div>
-              <p className="text-slate-400 font-black tracking-widest text-xs uppercase">No diagnostic findings identified</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100 font-black text-slate-400 uppercase tracking-widest">
-                    <th className="px-8 py-5">User Identity</th>
-                    <th className="px-8 py-5">Plate No.</th>
-                    <th className="px-8 py-5">Start Time</th>
-                    <th className="px-8 py-5">End Time</th>
-                    <th className="px-8 py-5">App Rel.</th>
-                    <th className="px-8 py-5">Status</th>
-                    <th className="px-8 py-5">Type</th>
-                    <th className="px-8 py-5">Manage</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {scanData.map((item, index) => (
-                    <tr key={item._id || index} className="hover:bg-primary-50/30 transition-all group">
-                      <td className="px-8 py-5 font-black text-slate-700 tracking-tight">{item.user_email}</td>
-                      <td className="px-8 py-5 whitespace-nowrap">
-                        <span className="font-mono bg-slate-900 text-primary-400 px-3 py-1.5 rounded-xl border border-slate-800 text-[11px] font-black tracking-widest shadow-lg shadow-slate-900/10">{item.license_plate}</span>
-                      </td>
-                      <td className="px-8 py-5 whitespace-nowrap text-slate-500 font-bold">
-                        {new Date(item.scan_start_time).toLocaleString()}
-                      </td>
-                      <td className="px-8 py-5 whitespace-nowrap text-slate-500 font-bold">
-                        {new Date(item.scan_end_time).toLocaleString()}
-                      </td>
-                      <td className="px-8 py-5 whitespace-nowrap">
-                        <Badge variant="secondary">{item.App_version}</Badge>
-                      </td>
-                      <td className="px-8 py-5 whitespace-nowrap">
-                        <Badge variant={item.scan_ended === 'true' ? 'success' : 'warning'}>
-                          {item.scan_ended === 'true' ? 'Complete' : 'Interrupt'}
-                        </Badge>
-                      </td>
-                      <td className="px-8 py-5 whitespace-nowrap text-slate-400 font-bold uppercase tracking-tighter">{item.type || 'Generic'}</td>
-                      <td className="px-8 py-5 whitespace-nowrap">
-                        <Button 
-                          variant="primary" 
-                          size="sm" 
-                          icon={ArrowRight} 
-                          iconPosition="right"
-                          className="h-9 px-4 font-black"
-                          onClick={() =>
-                            navigate(`/ObdScanReport/details/${item._id}`, {
-                              state: {
-                                ScanArray: item.ScanArray,
-                                DecodeArray: item.DecodeArray,
-                                start_time: item.scan_start_time,
-                                end_time: item.scan_end_time,
-                                license_plate: item.license_plate,
-                                email: item.user_email,
-                                App_version: item.App_version,
-                                scan_ended: item.scan_ended,
-                                functiones: item.functiones,
-                                type: item.type,
-                              },
-                            })
-                          }
-                        >
-                          Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {totalPages > 1 && (
-            <div className="p-6 bg-slate-50/30 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Manifest Fragment <span className="text-primary-600 font-black">{page}</span> of <span className="text-slate-900 font-black">{totalPages}</span>
-              </p>
-              
-              <div className="flex items-center gap-1.5">
-                <button
-                  className="w-11 h-11 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
-                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={page === 1}
-                >
-                  <ChevronLeft size={20} />
-                </button>
-
-                <div className="flex gap-2 mx-4">
-                  {generatePageNumbers().map((pageNum) => (
-                    <button
-                      key={pageNum}
-                      className={`w-10 h-10 rounded-xl text-[11px] font-black transition-all ${
-                        page === pageNum
-                          ? 'bg-primary-600 text-white shadow-lg shadow-primary-200'
-                          : 'bg-white text-slate-500 border border-slate-100 hover:bg-primary-50'
-                      }`}
-                      onClick={() => setPage(pageNum)}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  className="w-11 h-11 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
-                  onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-                  disabled={page === totalPages}
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-          )}
-        </Card>
+        <div className="flex justify-center">
+          <button
+            onClick={downloadExcel}
+            disabled={loading || scans.length === 0}
+            className="bg-blue-300 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded transition flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M3 17a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zM3.293 7.707A1 1 0 014 7h3V3a1 1 0 011-1h4a1 1 0 011 1v4h3a1 1 0 01.707 1.707l-7 7a1 1 0 01-1.414 0l-7-7z"/>
+            </svg>
+            Download Excel
+          </button>
+        </div>
       </div>
+
+      {loading && <p className="text-blue-500">Loading...</p>}
+
+      <table className="min-w-full bg-white border border-gray-200 text-sm">
+        <thead>
+          <tr>
+            <HeaderAndValue header={true} Title="Email" />
+            <HeaderAndValue header={true} Title="Start Time" />
+            <HeaderAndValue header={true} Title="End Time" />
+            <HeaderAndValue header={true} Title="Model" />
+            <HeaderAndValue header={true} Title="License Plate" />
+            <HeaderAndValue header={true} Title="VIN" />
+            <HeaderAndValue header={true} Title="Scan Ended" />
+            <HeaderAndValue header={true} Title="Make" />
+            <HeaderAndValue header={true} Title="Country" />
+            <HeaderAndValue header={true} Title="Funtion" />
+            <HeaderAndValue header={true} Title="Type" />
+            <HeaderAndValue header={true} Title="App Version" />
+            <HeaderAndValue header={true} Title="Bluetooth Device" />
+            <HeaderAndValue header={true} Title="PDF Report" />
+            <HeaderAndValue header={true} Title="Show" />
+          </tr>
+        </thead>
+        <tbody>
+          {scans.map((scan) => (
+            <tr key={`scan-${scan.id}`}>
+              <HeaderAndValue Title={scan.email} />
+              <HeaderAndValue Title={new Date(scan.scan_start_time).toLocaleString()} />
+              <HeaderAndValue Title={new Date(scan.scan_end_time).toLocaleString()} />
+              <HeaderAndValue Title={scan.model} />
+              <HeaderAndValue Title={scan.license_plate} />
+              <HeaderAndValue Title={scan.vin} />
+              <HeaderAndValue Title={scan.scan_ended} />
+              <HeaderAndValue Title={scan.make} />
+              <HeaderAndValue Title={scan.country_id} />
+              <HeaderAndValue Title={scan.function} />
+              <HeaderAndValue Title={scan.type} />
+              <HeaderAndValue Title={scan.app_version} />
+              <HeaderAndValue Title={scan.bluetooth_device} />
+              <td className="border px-4 py-2">
+                {scan.pdf_report ? (
+                  <a
+                    href={scan.pdf_report}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 underline"
+                  >
+                    View Report
+                  </a>
+                ) : (
+                  'No Report'
+                )}
+              </td>
+              <td className="border px-4 py-2">
+                <button
+                  onClick={() => handleViewDetails(scan)}
+                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                >
+                  View Details
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex flex-col items-center space-y-4">
+          <div className="flex items-center space-x-1">
+            <button
+              className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </button>
+
+            {generatePageNumbers().map((pageNum) => (
+              <button
+                key={`page-${pageNum}`}
+                className={`w-10 h-10 rounded-md font-medium transition-colors ${
+                  page === pageNum
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+                onClick={() => setPage(pageNum)}
+              >
+                {pageNum}
+              </button>
+            ))}
+
+            <button
+              className="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={page === totalPages}
+            >
+              Next
+            </button>
+          </div>
+
+          <p className="text-gray-600 text-sm">
+            Showing page {page} of {totalPages || 1} ({total} total items)
+          </p>
+        </div>
+      )}
     </div>
   );
 };
 
-export default ObdScanReport;
+export default Scandetail;
+
+
+

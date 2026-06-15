@@ -1,22 +1,4 @@
-import { useEffect, useState, useRef } from "react";
-import { 
-  AlertCircle, 
-  Search, 
-  Filter, 
-  Activity, 
-  Database,
-  Layout,
-  Zap,
-  ChevronLeft,
-  ChevronRight,
-  ShieldCheck,
-  Globe
-} from 'lucide-react';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Input from '../components/Input';
-import PageHeader from '../components/PageHeader';
-import Badge from '../components/Badge';
+import  { useEffect, useState, useRef } from "react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const ITEMS_PER_PAGE = 30;
@@ -51,6 +33,8 @@ const FaultCodeCauses = () => {
         searchMake = "",
         searchGeneric = ""
     ) => {
+        console.log('🔍 fetchCausesData called with:', { targetPage, searchDtc, searchMake, searchGeneric });
+        
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
@@ -70,6 +54,8 @@ const FaultCodeCauses = () => {
             if (searchGeneric !== "") params.append('generic', searchGeneric);
 
             const url = `${API_BASE_URL}api/FaultCodeCauses?${params.toString()}`;
+            console.log('📡 Making API call to:', url);
+            
             const token = localStorage.getItem("token");
 
             const response = await fetch(url, {
@@ -80,37 +66,55 @@ const FaultCodeCauses = () => {
                 },
             });
 
+            console.log('📥 Response status:', response.status, response.ok);
+
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ API Error:', errorText);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const result = await response.json();
+            console.log('✅ API Response:', result);
 
             if (result && Array.isArray(result.data)) {
+                console.log('📊 Setting data:', {
+                    dataLength: result.data.length,
+                    total: result.total,
+                    targetPage
+                });
+                
                 setCausesData(result.data);
                 setTotal(result.total || 0);
                 setPage(targetPage);
                 
                 if (result.data.length === 0) {
                     setError(searchDtc || searchMake || searchGeneric !== "" 
-                        ? "No secondary causes found for the specified criteria." 
-                        : "No causal data available."
+                        ? "No causes found for the specified criteria." 
+                        : "No causes available."
                     );
                 }
             } else {
+                console.error('❌ Invalid response structure:', result);
                 setCausesData([]);
                 setTotal(0);
                 setError("Invalid response format from server");
             }
 
         } catch (err:any) {
-            if (err.name === 'AbortError') return;
+            if (err.name === 'AbortError') {
+                console.log('🚫 Request aborted');
+                return;
+            }
+            
+            console.error("❌ Error fetching causes data:", err);
             setCausesData([]);
             setTotal(0);
-            setError("Failed to fetch causal diagnostic stream. Please try again.");
+            setError("Failed to fetch fault code causes. Please try again.");
         } finally {
             setLoading(false);
             abortControllerRef.current = null;
+            console.log('✨ fetchCausesData completed');
         }
     };
 
@@ -124,6 +128,14 @@ const FaultCodeCauses = () => {
     };
 
     const handlePageChange = (newPage:any) => {
+        console.log('🔄 Page change requested:', { 
+            newPage, 
+            currentPage: page, 
+            dtc, 
+            make, 
+            generic,
+            totalPages: Math.ceil(total / ITEMS_PER_PAGE)
+        });
         fetchCausesData(newPage, dtc, make, generic);
     };
 
@@ -162,176 +174,170 @@ const FaultCodeCauses = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
-            <PageHeader 
-                title="Fault Causality Analysis" 
-                subtitle="Root cause intelligence and subsystem failure tracing for DTC protocols"
-                icon={AlertCircle}
-            />
+        <div className="min-h-screen flex flex-col p-6 max-w-full mx-auto">
+            <h1 className="text-3xl font-bold text-center text-orange-700 mb-6">
+                Fault Code Causes
+            </h1>
 
-            {/* Filter Section */}
-            <Card title="Causal Filtering" icon={Filter}>
-                <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Input
-                        label="DTC Code"
-                        placeholder="e.g. P2453"
+            <div className="bg-white border rounded-lg shadow-sm p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <input
+                        type="text"
                         value={dtc}
                         onChange={(e) => setDtc(e.target.value)}
-                        icon={Zap}
+                        placeholder="DTC Code (e.g., P2453)"
+                        className="border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
-                    <Input
-                        label="Manufacturer"
-                        placeholder="e.g. Audi"
+                    <input
+                        type="text"
                         value={make}
                         onChange={(e) => setMake(e.target.value)}
-                        icon={Layout}
+                        placeholder="Make (e.g., Audi)"
+                        className="border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Architecture</label>
-                        <select
-                            value={generic}
-                            onChange={(e) => setGeneric(e.target.value)}
-                            className="h-11 w-full bg-slate-50 border-none rounded-xl px-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-primary-500/20 transition-all appearance-none cursor-pointer"
-                        >
-                            <option value="">All Architectures</option>
-                            <option value="true">Generic Protocol</option>
-                            <option value="false">OEM Specific</option>
-                        </select>
-                    </div>
-                    <div className="flex items-end">
-                        <Button 
-                            variant="primary" 
-                            className="w-full h-11" 
-                            type="submit" 
-                            isLoading={loading}
-                            icon={Search}
-                        >
-                            Execute Trace
-                        </Button>
-                    </div>
-                </form>
-            </Card>
-
-            {error && (
-                <div className="bg-red-50/50 border border-red-100 rounded-2xl p-6 text-center animate-shake">
-                    <Database className="mx-auto text-red-500 mb-3" size={32} />
-                    <p className="text-red-700 font-bold">{error}</p>
+                    <select
+                        value={generic}
+                        onChange={(e) => setGeneric(e.target.value)}
+                        className="border px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                        <option value="">All (Generic/Non-Generic)</option>
+                        <option value="true">Generic Only</option>
+                        <option value="false">Non-Generic Only</option>
+                    </select>
+                    <button
+                        onClick={handleSearch}
+                        disabled={loading}
+                        className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 transition disabled:opacity-50"
+                    >
+                        {loading ? "Loading..." : "Search"}
+                    </button>
                 </div>
-            )}
+            </div>
 
-            {/* Results Section */}
-            <div className="space-y-6">
+            {error && <p className="text-red-500 text-center py-4 text-lg">{error}</p>}
+
+            <div className="flex-1 overflow-auto space-y-6">
                 {loading ? (
-                    <div className="py-24 text-center">
-                        <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-                        <p className="text-slate-400 font-bold italic tracking-widest animate-pulse">ANALYZING CAUSAL CHAINS...</p>
+                    <div className="flex items-center justify-center py-20">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                            <p className="text-orange-500 text-xl">Loading causes...</p>
+                            <p className="text-gray-500 mt-2">Please wait while we fetch the data</p>
+                        </div>
                     </div>
                 ) : causesData.length > 0 ? (
-                    <Card title="Failure Logic Streams" icon={Activity} noPadding subtitle={`Total records identified: ${total}`}>
+                    <div className="bg-white border rounded-lg shadow-sm p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold text-orange-700">
+                                Causes Results
+                            </h2>
+                            <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                                {causesData.length} items
+                            </span>
+                        </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-100">
+                            <table className="min-w-full text-sm border">
+                                <thead className="bg-gray-100">
+                                    <tr>
                                         {columns.map((col) => (
-                                            <th key={col} className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest">
+                                            <th key={col} className="border px-3 py-2 text-left font-semibold">
                                                 {col}
                                             </th>
                                         ))}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
+                                <tbody>
                                     {causesData.map((item:any, idx) => (
-                                        <tr key={item.id || idx} className="hover:bg-primary-50/30 transition-colors group">
-                                            <td className="px-4 py-4 font-mono text-slate-400">#{item.id || "-"}</td>
-                                            <td className="px-4 py-4">
-                                                <code className="bg-primary-50 text-primary-600 px-2 py-1 rounded-lg font-black tracking-tighter text-sm">
-                                                    {item.dtc || "-"}
-                                                </code>
+                                        <tr key={item.id || idx} className="hover:bg-gray-50">
+                                            <td className="border px-3 py-2">
+                                                {item.id || "-"}
                                             </td>
-                                            <td className="px-4 py-4 max-w-lg">
-                                                <div className="flex items-start gap-2">
-                                                    <div className="mt-0.5 w-1.5 h-1.5 rounded-full bg-primary-200 group-hover:bg-primary-500 transition-colors shrink-0" />
-                                                    <p className="font-bold text-slate-700 leading-relaxed">{item.causes || "-"}</p>
+                                            <td className="border px-3 py-2 font-mono font-semibold text-orange-600">
+                                                {item.dtc || "-"}
+                                            </td>
+                                            <td className="border px-3 py-2 max-w-md">
+                                                <div className="text-gray-700 leading-relaxed">
+                                                    {item.causes || "-"}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-4">
-                                                <div className="flex items-center gap-2 text-slate-500 font-bold">
-                                                    <Globe size={14} className="text-slate-300" />
-                                                    {item.language || "EN"}
-                                                </div>
+                                            <td className="border px-3 py-2">
+                                                {item.language || "-"}
                                             </td>
-                                            <td className="px-4 py-4 font-bold text-slate-600">
-                                                {item.make || <Badge variant="secondary">Global</Badge>}
+                                            <td className="border px-3 py-2">
+                                                {item.make || "-"}
                                             </td>
-                                            <td className="px-4 py-4 text-slate-400 font-mono">
-                                                {item.company_id || "7F"}
+                                            <td className="border px-3 py-2">
+                                                {item.company_id || "-"}
                                             </td>
-                                            <td className="px-4 py-4">
-                                                {item.generic ? (
-                                                    <ShieldCheck className="text-emerald-500" size={18} />
-                                                ) : (
-                                                    <Badge variant="secondary">OEM</Badge>
-                                                )}
+                                            <td className="border px-3 py-2">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                    item.generic 
+                                                        ? "bg-orange-100 text-orange-800" 
+                                                        : "bg-gray-100 text-gray-800"
+                                                }`}>
+                                                    {item.generic ? "Yes" : "No"}
+                                                </span>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    </Card>
-                ) : !error && (
-                    <div className="py-24 text-center bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
-                        <Database size={48} className="mx-auto text-slate-200 mb-4" />
-                        <p className="text-slate-400 font-bold italic">No causal traces found in current diagnostic selection.</p>
                     </div>
-                )}
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-4 px-2">
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest order-2 md:order-1">
-                            Page {page} of {totalPages} <span className="mx-2 text-slate-200">|</span> Total Items: {total}
-                        </p>
-                        
-                        <div className="flex items-center gap-2 order-1 md:order-2">
-                            <Button
-                                variant="secondary"
-                                onClick={() => handlePageChange(page - 1)}
-                                disabled={page === 1 || loading}
-                                icon={ChevronLeft}
-                                size="sm"
-                                className="w-10 h-10 p-0 flex items-center justify-center"
-                            />
-
-                            <div className="flex gap-2 mx-2">
-                                {getVisiblePages().map((pageNum) => (
-                                    <button
-                                        key={pageNum}
-                                        onClick={() => handlePageChange(pageNum)}
-                                        disabled={loading}
-                                        className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${
-                                            page === pageNum
-                                                ? "bg-primary-600 text-white shadow-lg shadow-primary-200"
-                                                : "bg-white text-slate-500 border border-slate-100 hover:border-primary-200 hover:text-primary-600"
-                                        } disabled:opacity-50`}
-                                    >
-                                        {pageNum}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <Button
-                                variant="secondary"
-                                onClick={() => handlePageChange(page + 1)}
-                                disabled={page === totalPages || loading}
-                                icon={ChevronRight}
-                                size="sm"
-                                className="w-10 h-10 p-0 flex items-center justify-center"
-                            />
-                        </div>
+                ) : !error && (
+                    <div className="text-center py-20">
+                        <p className="text-gray-500 text-xl">No causes data to display</p>
+                        <p className="text-gray-400 mt-2">Try searching with different criteria</p>
                     </div>
                 )}
             </div>
+
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 mt-6">
+                    <button
+                        onClick={() => handlePageChange(page - 1)}
+                        disabled={page === 1 || loading}
+                        className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition"
+                    >
+                        Previous
+                    </button>
+
+                    <div className="flex gap-2">
+                        {getVisiblePages().map((pageNum) => (
+                            <button
+                                key={pageNum}
+                                onClick={() => handlePageChange(pageNum)}
+                                disabled={loading}
+                                className={`px-3 py-2 rounded transition ${
+                                    page === pageNum
+                                        ? "bg-orange-600 text-white"
+                                        : "bg-gray-200 hover:bg-gray-300"
+                                } disabled:opacity-50`}
+                            >
+                                {pageNum}
+                            </button>
+                        ))}
+                    </div>
+
+                    <button
+                        onClick={() => handlePageChange(page + 1)}
+                        disabled={page === totalPages || loading}
+                        className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
+
+            {total > 0 && (
+                <div className="text-center text-sm text-gray-500 mt-2 bg-white rounded-lg p-4 border">
+                    <div className="flex flex-wrap justify-center items-center gap-6">
+                        <span>📄 Page {page} of {totalPages}</span>
+                        <span>📊 Total Items: {total}</span>
+                        <span>🔧 Current Page Items: {causesData.length}</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

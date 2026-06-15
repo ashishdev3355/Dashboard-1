@@ -1,28 +1,9 @@
 import { useState, useEffect, } from 'react';
-import { 
-  Search, 
-  ChevronLeft, 
-  ChevronRight, 
-  Car, 
-  Settings, 
-  FileSpreadsheet, 
-  RefreshCw, 
-  AlertCircle,
-  Database,
-  ShieldCheck,
-  Terminal,
-  Activity,
-  Layers,
-  Info
-} from 'lucide-react';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Input from '../components/Input';
-import PageHeader from '../components/PageHeader';
-import Badge from '../components/Badge';
+import { Search, ChevronLeft, ChevronRight, Car, Settings, FileSpreadsheet, RefreshCw, AlertCircle } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+// Type definitions
 interface CommandData {
   command: string;
   module: string;
@@ -45,12 +26,14 @@ const CommandAPIFrontend = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Search and filter states
   const [make, setMake] = useState<string>('Honda');
   const [selectedModules, setSelectedModules] = useState<string>('Engine, ABS');
   const [functionType, setFunctionType] = useState<string>('scan');
   const [fullScan, setFullScan] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   
+  // Pagination state
   const [pagination, setPagination] = useState<PaginationInfo>({
     currentPage: 1,
     totalPages: 1,
@@ -58,31 +41,57 @@ const CommandAPIFrontend = () => {
     itemsPerPage: 100
   });
 
+  // Available modules (extracted from your data)
+ 
+
   const fetchCommands = async () => {
     setLoading(true);
     setError(null);
     
     try {
+      // Build query parameters
       const params = new URLSearchParams({
         make,
         function_type: functionType,
         full_scan: fullScan.toString()
       });
       
+      // Convert selectedModules string to array for API
       const modulesArray = selectedModules.split(',').map(m => m.trim()).filter(m => m);
       params.append('module', JSON.stringify(modulesArray));
       
-      const url = `${BASE_URL}api/CommandAPI?${params}`;
-      const token = localStorage.getItem("token");
-      
-      const response = await fetch(url, {
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      const possibleEndpoints = [
+        `${BASE_URL}api/CommandAPI?${params}`,
+       
+      ];
 
-      if (!response.ok) throw new Error(`Transmission failure: ${response.status}`);
+      let response: Response | undefined;
+      const token = localStorage.getItem("token");
+      for (const endpoint of possibleEndpoints) {
+        try {
+          console.log(`Trying endpoint: ${endpoint}`);
+          response = await fetch(endpoint,{
+             headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}), // ✅ attach token
+        },
+          });
+          
+          if (response.status !== 404) {
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!response || response.status === 404) {
+        throw new Error('API endpoint not found. Please check your server configuration.');
+      }
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
 
       const result: ApiResponse = await response.json();
       
@@ -90,6 +99,7 @@ const CommandAPIFrontend = () => {
         setCommands(result.data);
         setFilteredCommands(result.data);
         
+        // Update pagination
         const totalItems = result.data.length;
         const totalPages = Math.ceil(totalItems / pagination.itemsPerPage);
         setPagination(prev => ({
@@ -99,10 +109,21 @@ const CommandAPIFrontend = () => {
           currentPage: 1
         }));
       } else {
-        throw new Error('Invalid telemetry format encountered');
+        throw new Error('Invalid response format');
       }
-    } catch (err: any) {
-      setError(err.message || 'Fatal synchronisation error');
+    } catch (err: unknown) {
+      console.error('Fetch error:', err);
+      let errorMessage = 'An unknown error occurred';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        
+        if (err.message.includes('Failed to fetch')) {
+          errorMessage = 'Cannot connect to server. Please check if the server is running.';
+        }
+      }
+      
+      setError(errorMessage);
       setCommands([]);
       setFilteredCommands([]);
     } finally {
@@ -110,6 +131,7 @@ const CommandAPIFrontend = () => {
     }
   };
 
+  // Filter commands based on search term
   useEffect(() => {
     let filtered = commands;
     
@@ -122,6 +144,7 @@ const CommandAPIFrontend = () => {
     
     setFilteredCommands(filtered);
     
+    // Update pagination for filtered results
     const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / pagination.itemsPerPage);
     setPagination(prev => ({
@@ -132,6 +155,7 @@ const CommandAPIFrontend = () => {
     }));
   }, [commands, searchTerm, pagination.itemsPerPage]);
 
+  // Get paginated data
   const getPaginatedData = () => {
     const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage;
     const endIndex = startIndex + pagination.itemsPerPage;
@@ -144,237 +168,315 @@ const CommandAPIFrontend = () => {
     }
   };
 
+  
+
+  // Auto-fetch on component mount
   useEffect(() => {
     fetchCommands();
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-12 px-6">
-      <PageHeader 
-        title="Diagnostic Command Hub" 
-        subtitle="Low-level protocol interface for vehicle infrastructure management and command mapping"
-        icon={Terminal}
-        action={
-          <div className="flex gap-3">
-             <Button 
-                variant="outline" 
-                onClick={fetchCommands} 
-                isLoading={loading}
-                icon={RefreshCw}
-              >
-                Sync Manifest
-              </Button>
-          </div>
-        }
-      />
-
-      <div className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <Card title="Query Engineering" icon={Settings} subtitle="Configure protocol parameters and target systems">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  fetchCommands();
-                }}
-                className="space-y-6"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Input
-                    label="Target Manufacturer"
-                    placeholder="e.g. Honda, BMW"
-                    value={make}
-                    onChange={(e) => setMake(e.target.value)}
-                    icon={Database}
-                  />
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Protocol Function</label>
-                    <select
-                      value={functionType}
-                      onChange={(e) => setFunctionType(e.target.value)}
-                      className="h-11 w-full bg-slate-50 border-none rounded-xl px-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-primary-500/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="scan">System Scan</option>
-                      <option value="live_data">Real-time Telemetry</option>
-                      <option value="vin">VIN Identification</option>
-                      <option value="clear">DTC Purge</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Input
-                    label="Module Manifest"
-                    placeholder="Engine, ABS, Airbag"
-                    value={selectedModules}
-                    onChange={(e) => setSelectedModules(e.target.value)}
-                    icon={Layers}
-                  />
-                  <div className="p-4 bg-slate-50 rounded-2xl flex items-center justify-between border border-slate-100/50">
-                    <span className="text-xs font-black text-slate-600 uppercase tracking-tight">Recursive Scan</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
-                        checked={fullScan}
-                        onChange={(e) => setFullScan(e.target.checked)}
-                      />
-                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
-                  </div>
-                </div>
-                
-                <div className="flex justify-end pt-2">
-                  <Button type="submit" variant="primary" className="px-12 h-11 shadow-lg shadow-primary-100" isLoading={loading} icon={RefreshCw}>
-                    Execute Sync
-                  </Button>
-                </div>
-              </form>
-            </Card>
-          </div>
-          
-          <div className="lg:col-span-1">
-            <Card title="Session Statistics" icon={Activity} subtitle="Active telemetry metrics">
-              <div className="space-y-6">
-                  <div className="flex justify-between items-end">
-                    <p className="text-[10px] font-black text-slate-400 uppercase">Synchronized Commands</p>
-                    <p className="text-3xl font-black text-primary-600 tracking-tighter">{pagination.totalItems}</p>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(37,99,235,0.4)]" style={{ width: '100%' }}></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Items / Frame</p>
-                      <p className="font-black text-slate-700">{pagination.itemsPerPage}</p>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Total Frames</p>
-                      <p className="font-black text-slate-700">{pagination.totalPages}</p>
-                    </div>
-                  </div>
-                  <p className="text-[10px] font-bold text-slate-400 italic">Protocol vectors aligned for diagnostic streaming.</p>
-              </div>
-            </Card>
+    <div className="max-w-7xl mx-auto p-6 ml-10 bg-gray-50 min-h-screen">
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-8">
+          <div className="flex items-center space-x-3">
+            <Settings className="w-8 h-8 text-white" />
+            <div>
+              <h1 className="text-2xl font-bold text-white">Automotive Diagnostic Commands</h1>
+              <p className="text-blue-100 mt-1">Search and manage OBD-II diagnostic commands by vehicle make and module</p>
+            </div>
           </div>
         </div>
 
-        <Card title="Live Command Manifest" icon={ShieldCheck} subtitle={searchTerm ? `Filtered by: ${searchTerm}` : "Global Registry"}>
-          <div className="mb-6">
-            <Input 
-              placeholder="Filter local manifest (Command identifier or Module name)..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              icon={Search}
-              className="bg-slate-50 border-none h-12"
-            />
-          </div>
+        <div className="p-6">
+          
+        <div>
+          
+             <form
+            onSubmit={(e) => {
+              e.preventDefault(); // prevent page reload
+              fetchCommands();    // trigger your function
+            }}
+            className="bg-gray-50 rounded-lg p-6 mb-6"
+            >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              {/* Vehicle Make */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Make</label>
+                <input
+                  type="text"
+                  placeholder="Enter vehicle make..."
+                  value={make}
+                  onChange={(e) => setMake(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
 
-          {loading ? (
-            <div className="py-32 text-center overflow-hidden">
-              <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-              <p className="text-slate-400 font-black italic tracking-widest uppercase text-xs animate-pulse">Correlating Command Vectors...</p>
-            </div>
-          ) : filteredCommands.length > 0 ? (
-            <div className="overflow-x-auto rounded-[24px] border border-slate-100 shadow-sm bg-white">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-8 py-5 font-black text-slate-400 uppercase tracking-widest w-1/2">Command String</th>
-                    <th className="px-8 py-5 font-black text-slate-400 uppercase tracking-widest text">Target Module</th>
-                    <th className="px-8 py-5 font-black text-slate-400 uppercase tracking-widest text-center">Classification</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {getPaginatedData().map((command, index) => (
-                    <tr key={index} className="hover:bg-primary-50/20 transition-all group">
-                      <td className="px-8 py-5">
-                        <code className="bg-slate-900 text-primary-400 px-4 py-2 rounded-xl font-mono text-[11px] font-black tracking-wider block w-fit shadow-lg shadow-slate-900/10">
-                          {command.command}
-                        </code>
-                      </td>
-                      <td className="px-8 py-5">
-                        <span className="font-black text-slate-700 tracking-tight text-sm uppercase">{command.module}</span>
-                      </td>
-                      <td className="px-8 py-5 text-center">
-                          <Badge variant={command.command.startsWith('AT') ? 'warning' : 'primary'}>
-                            {command.command.startsWith('AT') ? 'SETUP' : 'DIAGNOSTIC'}
-                          </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="py-32 text-center bg-slate-50 rounded-[32px] border border-dashed border-slate-200 animate-fadeIn">
-              <Info size={56} className="mx-auto text-slate-200 mb-6" />
-              <p className="text-slate-500 font-black italic tracking-tight text-lg">No command definitions identified.</p>
-              <p className="text-slate-400 font-bold mt-2">Adjust your query parameters to find target hooks.</p>
-            </div>
-          )}
-
-          {pagination.totalPages > 1 && (
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 mt-10 pt-8 border-t border-slate-100">
-              <div className="flex items-center gap-4 bg-slate-50 px-5 py-2.5 rounded-2xl border border-slate-100">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Burst Frame Size</p>
+              {/* Function Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Function Type</label>
                 <select
-                  value={pagination.itemsPerPage}
-                  onChange={(e) => setPagination(prev => ({
-                    ...prev,
-                    itemsPerPage: parseInt(e.target.value),
-                    currentPage: 1
-                  }))}
-                  className="bg-transparent border-none rounded-lg p-0 text-[11px] font-black text-primary-600 focus:ring-0 cursor-pointer"
+                  value={functionType}
+                  onChange={(e) => setFunctionType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  {[30, 50, 100, 200].map(size => (
-                    <option key={size} value={size}>{size} / Frame</option>
-                  ))}
+                  <option value="scan">Scan</option>
+                  <option value="live_data">Live Data</option>
+                  <option value="vin">vin</option>
+                  
+                  <option value="clear">Clear Codes</option>
                 </select>
               </div>
-              
-              <div className="flex items-center gap-1.5">
-                <button
-                  className="w-11 h-11 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
-                  onClick={() => handlePageChange(pagination.currentPage - 1)}
-                  disabled={pagination.currentPage === 1}
-                >
-                  <ChevronLeft size={20} />
-                </button>
 
-                <div className="flex items-center gap-2 mx-3">
-                  <span className="bg-primary-600 text-white px-5 py-2 rounded-xl text-xs font-black shadow-lg shadow-primary-200">
-                    {pagination.currentPage}
-                  </span>
-                  <span className="text-slate-300 font-black px-1">/</span>
-                  <span className="bg-white border border-slate-100 text-slate-500 px-5 py-2 rounded-xl text-xs font-black shadow-sm">
-                    {pagination.totalPages}
-                  </span>
+              {/* Full Scan Toggle */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Scan Type</label>
+                <div className="flex items-center space-x-3 py-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={fullScan}
+                      onChange={(e) => setFullScan(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Full Scan</span>
+                  </label>
                 </div>
+              </div>
 
-                <button
-                  className="w-11 h-11 flex items-center justify-center bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary-600 hover:border-primary-200 transition-all disabled:opacity-30 shadow-sm"
-                  onClick={() => handlePageChange(pagination.currentPage + 1)}
-                  disabled={pagination.currentPage === pagination.totalPages}
-                >
-                  <ChevronRight size={20} />
-                </button>
+              {/* Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Search Commands</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search commands or modules..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Module Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select Modules</label>
+              <input
+                type="text"
+                placeholder="Enter modules (comma separated)..."
+                value={selectedModules}
+                onChange={(e) => setSelectedModules(e.target.value)}
+                className="w-70 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Example: Engine, ABS, HVAC
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="submit"   
+                disabled={loading || !selectedModules.trim()}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Fetch Commands
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>  
+
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3 mb-6">
+              <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-red-900">Error</h4>
+                <p className="text-red-700 text-sm mt-1">{error}</p>
               </div>
             </div>
           )}
-        </Card>
+
+          {/* Results Section */}
+          {filteredCommands.length > 0 && (
+            <div className="space-y-4">
+              {/* Results Summary */}
+              <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <Car className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-blue-900">
+                    {pagination.totalItems} commands found for {make}
+                  </span>
+                  {searchTerm && (
+                    <span className="text-sm text-blue-700">
+                      (filtered by "{searchTerm}")
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm text-blue-700">
+                  Modules: {selectedModules}
+                </div>
+              </div>
+
+              
+
+              {/* Commands Table */}
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Command
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Module
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {getPaginatedData().map((command, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 whitespace-nowrap">
+                            <code className="text-sm font-mono  px-2 py-1 rounded">
+                              {command.command}
+                            </code>
+                          </td>
+                          <td className="px-6  whitespace-nowrap text-sm text-gray-900">
+                            <span className="inline-flex items-center rounded-full text-xs font-medium ">
+                              {command.module}
+                            </span>
+                          </td>
+                          <td className="px-6  whitespace-nowrap text-sm ">
+                            {command.command.startsWith('AT') ? 'Setup' : 'Diagnostic'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Bottom Pagination */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm text-gray-700">Items per page:</label>
+                  <select
+                    value={pagination.itemsPerPage}
+                    onChange={(e) => setPagination(prev => ({
+                      ...prev,
+                      itemsPerPage: parseInt(e.target.value),
+                      currentPage: 1
+                    }))}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value={10}>10</option>
+                    <option value={30}>30</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handlePageChange(1)}
+                    disabled={pagination.currentPage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    First
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(pagination.currentPage - 1)}
+                    disabled={pagination.currentPage === 1}
+                    className="inline-flex items-center px-3 py-1 border border-gray-300 rounded text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </button>
+                  
+                  {/* Page Numbers */}
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    const startPage = Math.max(1, pagination.currentPage - 2);
+                    const pageNum = startPage + i;
+                    if (pageNum > pagination.totalPages) return null;
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`px-3 py-1 border rounded text-sm font-medium transition-colors ${
+                          pageNum === pagination.currentPage
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={() => handlePageChange(pagination.currentPage + 1)}
+                    disabled={pagination.currentPage === pagination.totalPages}
+                    className="inline-flex items-center px-3 py-1 border border-gray-300 rounded text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(pagination.totalPages)}
+                    disabled={pagination.currentPage === pagination.totalPages}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Last
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && filteredCommands.length === 0 && !error && (
+            <div className="text-center py-12">
+              <FileSpreadsheet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Commands Found</h3>
+              <p className="text-gray-500 mb-4">
+                {commands.length === 0 
+                  ? 'Click "Fetch Commands" to load diagnostic commands'
+                  : 'No commands match your search criteria'
+                }
+              </p>
+              {commands.length === 0 && (
+                <button
+                  onClick={fetchCommands}
+                  disabled={!selectedModules.trim()}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Fetch Commands
+                </button>
+              )}
+            </div>
+          )}
+
         
-        {error && (
-          <div className="bg-rose-50 border border-rose-100 rounded-[24px] p-6 flex items-center gap-4 text-rose-600 font-black text-sm animate-shake shadow-sm">
-            <div className="bg-rose-100 p-2 rounded-xl">
-              <AlertCircle size={24} />
-            </div>
-            <div className="flex flex-col">
-              <span className="uppercase text-[10px] opacity-60 tracking-widest mb-0.5">System Fault Identified</span>
-              <span>{error}</span>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
