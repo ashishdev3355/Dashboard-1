@@ -6,7 +6,7 @@ import ScanDcodeArr from "./ScanDcodeArr";
 const ScanDetailPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { ScanArray, DecodeArray, start_time, end_time, license_plate, email, App_version, scan_ended, functiones, type } = location.state || {};
+  const { ScanArray, DecodeArray, start_time, end_time, license_plate, email, App_version, scan_ended, functiones, type, bluetooth_device } = location.state || {};
 
   useEffect(() => {
     console.log('🔵 Details page mounted');
@@ -55,6 +55,7 @@ const ScanDetailPage = () => {
         scan_ended={scan_ended} 
         functiones={functiones} 
         type={type} 
+        bluetooth_device={bluetooth_device} 
       />
     </div>
   );

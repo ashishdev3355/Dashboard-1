@@ -345,6 +345,7 @@ const Scandetail = () => {
         scan_ended: scan.scan_ended,
         functiones: scan.function,
         type: scan.type,
+        bluetooth_device: scan.bluetooth_device,
       },
     });
   };
@@ -423,6 +424,7 @@ const Scandetail = () => {
             <HeaderAndValue header={true} Title="Funtion" />
             <HeaderAndValue header={true} Title="Type" />
             <HeaderAndValue header={true} Title="App Version" />
+            <HeaderAndValue header={true} Title="Bluetooth Device" />
             <HeaderAndValue header={true} Title="PDF Report" />
             <HeaderAndValue header={true} Title="Show" />
           </tr>
@@ -442,6 +444,7 @@ const Scandetail = () => {
               <HeaderAndValue Title={scan.function} />
               <HeaderAndValue Title={scan.type} />
               <HeaderAndValue Title={scan.app_version} />
+              <HeaderAndValue Title={scan.bluetooth_device} />
               <td className="border px-4 py-2">
                 {scan.pdf_report ? (
                   <a

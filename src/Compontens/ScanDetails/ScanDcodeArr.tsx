@@ -31,6 +31,7 @@ interface ScanProps {
   scan_ended: string;
   functiones: string;
   type: string;
+  bluetooth_device?: string;
 }
 
 const ScanDcodeArr: React.FC<ScanProps> = ({
@@ -43,7 +44,8 @@ const ScanDcodeArr: React.FC<ScanProps> = ({
   app_version,
   functiones,
   type,
-  scan_ended
+  scan_ended,
+  bluetooth_device
 }) => {
   const calculateDuration = () => {
     const start = new Date(start_time);
@@ -73,15 +75,19 @@ const ScanDcodeArr: React.FC<ScanProps> = ({
             </tr>
             <tr>
               <RowAndTitle title="App Version" value={app_version} />
-              <RowAndTitle title="Function" value={functiones} />
+              <RowAndTitle title="Bluetooth Device" value={bluetooth_device} />
             </tr>
             <tr>
+              <RowAndTitle title="Function" value={functiones} />
               <RowAndTitle title="Type" value={type} />
+            </tr>
+            <tr>
               <RowAndTitle title="Scan Duration" value={calculateDuration()} />
+              <RowAndTitle title="Scan Ended" value={scan_ended} />
             </tr>
             <tr>
               <RowAndTitle title="Row Count" value={ScanArray?.length || 0} />
-              <RowAndTitle title="Scan Ended" value={scan_ended} />
+              <RowAndTitle title="" value="" />
             </tr>
           </tbody>
         </table>
