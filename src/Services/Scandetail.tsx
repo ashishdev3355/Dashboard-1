@@ -39,6 +39,7 @@ interface ScanItem {
   pdf_report: string;
   scanResArray: ScanResItem[] | null;
   decodedArray: DecodedArrayItem[] | null;
+  bluetooth_device?: string;
 }
 
 interface Filters {
@@ -444,7 +445,7 @@ const Scandetail = () => {
               <HeaderAndValue Title={scan.function} />
               <HeaderAndValue Title={scan.type} />
               <HeaderAndValue Title={scan.app_version} />
-              <HeaderAndValue Title={scan.bluetooth_device} />
+              <HeaderAndValue Title={scan.bluetooth_device ?? null} />
               <td className="border px-4 py-2">
                 {scan.pdf_report ? (
                   <a
