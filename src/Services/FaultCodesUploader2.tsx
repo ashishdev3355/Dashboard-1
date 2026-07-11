@@ -2,6 +2,13 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Bug, TrendingUp } from 'lucide-react';
 
+interface DuplicateDetail {
+  rowNumber: number;
+  dtc: string;
+  companyId: number;
+  reason: string;
+}
+
 interface UploadResponse {
   message: string;
   stats?: {
@@ -15,10 +22,11 @@ interface UploadResponse {
     fileSize: number;
     companyId: number;
     worksheetName: string;
+    duplicateDetails?: DuplicateDetail[];
   };
 }
 
-const API_BASE_URL =  import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const FaultCodesUploader2: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -31,7 +39,7 @@ const FaultCodesUploader2: React.FC = () => {
 
   const handleFileSelect = (selectedFile: File) => {
     if (selectedFile && (
-      selectedFile.name.endsWith('.xlsx') || 
+      selectedFile.name.endsWith('.xlsx') ||
       selectedFile.name.endsWith('.xls')
     )) {
       setFile(selectedFile);
@@ -86,9 +94,9 @@ const FaultCodesUploader2: React.FC = () => {
 
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const token = localStorage.getItem("token");
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}api/faultCodes`, {
         method: 'POST',
@@ -147,11 +155,10 @@ const FaultCodesUploader2: React.FC = () => {
 
       {/* File Upload Area */}
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
-          isDragOver 
-            ? 'border-red-400 bg-red-50' 
-            : 'border-gray-300 hover:border-red-400 hover:bg-gray-50'
-        }`}
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${isDragOver
+          ? 'border-red-400 bg-red-50'
+          : 'border-gray-300 hover:border-red-400 hover:bg-gray-50'
+          }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -264,16 +271,47 @@ const FaultCodesUploader2: React.FC = () => {
             <p><strong>Worksheet:</strong> {stats.worksheetName}</p>
             <p><strong>Company ID:</strong> {stats.companyId}</p>
           </div>
+
+          {/* Skipped Duplicates Table */}
+          {stats.duplicateDetails && stats.duplicateDetails.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-green-200">
+              <h5 className="font-semibold text-sm text-yellow-800 mb-2 flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-yellow-600" />
+                Skipped Duplicate Details ({stats.duplicateDetails.length} rows)
+              </h5>
+              <div className="overflow-x-auto max-h-56 border border-yellow-200 rounded-lg">
+                <table className="min-w-full divide-y divide-yellow-100 text-xs">
+                  <thead className="bg-yellow-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-yellow-800">Excel Row</th>
+                      <th className="px-3 py-2 text-left font-medium text-yellow-800">DTC</th>
+                      <th className="px-3 py-2 text-left font-medium text-yellow-800">Company ID</th>
+                      <th className="px-3 py-2 text-left font-medium text-yellow-800">Deduplication Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-yellow-100 bg-white text-gray-700">
+                    {stats.duplicateDetails.map((dup, idx) => (
+                      <tr key={idx} className="hover:bg-yellow-50/50">
+                        <td className="px-3 py-1.5 font-mono text-gray-500">{dup.rowNumber}</td>
+                        <td className="px-3 py-1.5 font-mono font-semibold text-gray-900">{dup.dtc}</td>
+                        <td className="px-3 py-1.5 font-mono">{dup.companyId}</td>
+                        <td className="px-3 py-1.5 text-gray-600 font-medium">{dup.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Status Message */}
       {message && (
-        <div className={`mt-4 p-4 rounded-lg flex items-center gap-2 ${
-          uploadStatus === 'success' 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
-            : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
+        <div className={`mt-4 p-4 rounded-lg flex items-center gap-2 ${uploadStatus === 'success'
+          ? 'bg-green-50 text-green-800 border border-green-200'
+          : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
           {uploadStatus === 'success' ? (
             <CheckCircle className="w-5 h-5 text-green-600" />
           ) : (
@@ -288,11 +326,10 @@ const FaultCodesUploader2: React.FC = () => {
         <button
           onClick={handleUpload}
           disabled={!file || isUploading}
-          className={`px-8 py-3 rounded-lg font-medium flex items-center gap-2 transition-all duration-200 ${
-            !file || isUploading
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-red-600 text-white hover:bg-red-700 hover:shadow-lg transform hover:scale-105'
-          }`}
+          className={`px-8 py-3 rounded-lg font-medium flex items-center gap-2 transition-all duration-200 ${!file || isUploading
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-red-600 text-white hover:bg-red-700 hover:shadow-lg transform hover:scale-105'
+            }`}
         >
           <Upload className="w-5 h-5" />
           {isUploading ? 'Processing Excel...' : 'Import Fault Codes'}
