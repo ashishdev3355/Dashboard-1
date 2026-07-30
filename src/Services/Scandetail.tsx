@@ -39,6 +39,7 @@ interface ScanItem {
   pdf_report: string;
   scanResArray: ScanResItem[] | null;
   decodedArray: DecodedArrayItem[] | null;
+  vinResArray?: ScanResItem[] | null;
   bluetooth_device?: string;
 }
 
@@ -334,10 +335,11 @@ const Scandetail = () => {
     }, 10);
     
     navigate(`/ObdScanReport/details/${scan.id}`, {
-    // navigate(`/ObdScanReport/details`, {
       state: {
         ScanArray: scan.scanResArray,
         DecodeArray: scan.decodedArray,
+        VinArray: scan.vinResArray,
+        vin: scan.vin,
         start_time: scan.scan_start_time,
         end_time: scan.scan_end_time,
         license_plate: scan.license_plate,

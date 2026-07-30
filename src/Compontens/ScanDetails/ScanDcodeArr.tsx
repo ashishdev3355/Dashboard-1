@@ -20,9 +20,20 @@ interface ScanResItem {
   system: string;
 }
 
+interface VinResItem {
+  pid: string;
+  data: string;
+  make?: string;
+  header: string;
+  protocol: string;
+  system?: string;
+}
+
 interface ScanProps {
   ScanArray: ScanResItem[] | null;
   DecodeArray: DecodedArrayItem[] | null;
+  VinArray?: VinResItem[] | null;
+  vin?: string;
   start_time: string;
   end_time: string;
   license_plate: string;
@@ -37,6 +48,8 @@ interface ScanProps {
 const ScanDcodeArr: React.FC<ScanProps> = ({
   ScanArray,
   DecodeArray,
+  VinArray,
+  vin,
   start_time,
   end_time,
   license_plate,
@@ -87,7 +100,7 @@ const ScanDcodeArr: React.FC<ScanProps> = ({
             </tr>
             <tr>
               <RowAndTitle title="Row Count" value={ScanArray?.length || 0} />
-              <RowAndTitle title="" value="" />
+              <RowAndTitle title="VIN" value={vin || 'N/A'} />
             </tr>
           </tbody>
         </table>
@@ -134,6 +147,37 @@ const ScanDcodeArr: React.FC<ScanProps> = ({
         )}
       </section>
 
+      {/* VIN Response Results Section */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold mb-3">VIN Response Results</h2>
+        {VinArray && VinArray.length > 0 ? (
+          <table className="table-auto w-full border border-collapse text-left">
+            <thead className="bg-gray-100">
+              <tr>
+                <HeaderAndValue header={true} Title="PID" />
+                <HeaderAndValue header={true} Title="Data" />
+                <HeaderAndValue header={true} Title="Header" />
+                <HeaderAndValue header={true} Title="Protocol" />
+                <HeaderAndValue header={true} Title="Make" />
+              </tr>
+            </thead>
+            <tbody>
+              {VinArray.map((item, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <HeaderAndValue Title={item.pid || 'N/A'} />
+                  <HeaderAndValue Title={item.data || 'N/A'} />
+                  <HeaderAndValue Title={item.header || 'N/A'} />
+                  <HeaderAndValue Title={item.protocol || 'N/A'} />
+                  <HeaderAndValue Title={item.make || 'N/A'} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="text-gray-500 italic">No VIN response data available.</p>
+        )}
+      </section>
+
       {/* Raw Scan Results Section */}
       <section>
         <h2 className="text-xl font-semibold mb-3">Raw Scan Results</h2>
@@ -160,7 +204,7 @@ const ScanDcodeArr: React.FC<ScanProps> = ({
                   <HeaderAndValue Title={item.make} />
                 </tr>
               ))}
-            </tbody>+
+            </tbody>
           </table>
         ) : (
           <p className="text-gray-500 italic">No scan data available.</p>

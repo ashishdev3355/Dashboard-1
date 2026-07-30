@@ -6,7 +6,7 @@ import ScanDcodeArr from "./ScanDcodeArr";
 const ScanDetailPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { ScanArray, DecodeArray, start_time, end_time, license_plate, email, App_version, scan_ended, functiones, type, bluetooth_device } = location.state || {};
+  const { ScanArray, DecodeArray, VinArray, vin, start_time, end_time, license_plate, email, App_version, scan_ended, functiones, type, bluetooth_device } = location.state || {};
 
   useEffect(() => {
     console.log('🔵 Details page mounted');
@@ -47,6 +47,8 @@ const ScanDetailPage = () => {
       <ScanDcodeArr 
         ScanArray={ScanArray} 
         DecodeArray={DecodeArray} 
+        VinArray={VinArray}
+        vin={vin}
         start_time={start_time} 
         end_time={end_time}
         license_plate={license_plate} 
