@@ -23,13 +23,21 @@ export interface AuthResponse {
 // Signup
 // -------------------------
 export async function signup(email: string, password: string): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE_URL}api/signup`, {
+  const url = `${API_BASE_URL?.endsWith('/') ? API_BASE_URL : `${API_BASE_URL}/`}api/signup`;
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
 
-  const data: AuthResponse = await res.json();
+  const text = await res.text();
+  let data: AuthResponse;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { message: '', error: `Request failed with status ${res.status}` };
+  }
+
   if (res.ok && data.token) {
     localStorage.setItem("token", data.token);
   }
@@ -40,13 +48,21 @@ export async function signup(email: string, password: string): Promise<AuthRespo
 // Login
 // -------------------------
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE_URL}api/login`, {
+  const url = `${API_BASE_URL?.endsWith('/') ? API_BASE_URL : `${API_BASE_URL}/`}api/login`;
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
 
-  const data: AuthResponse = await res.json();
+  const text = await res.text();
+  let data: AuthResponse;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { message: '', error: `Request failed with status ${res.status}` };
+  }
+
   if (res.ok && data.token) {
     localStorage.setItem("token", data.token);
     if (data.user && data.user.role_id) {
