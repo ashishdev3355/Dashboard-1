@@ -26,6 +26,8 @@ import FaultCodeSymptoms from "./Services/FaultCodeSymptoms.tsx";
 import FaultCodeSolutions from "./Services/FaultCodeSolutions.tsx";
 import FaultCodeCauses from "./Services/FaultCodeCauses.tsx";
 import FaultCodeList from "./Services/FaultCodeList.tsx";
+import ProductListPage from "./pages/Products/ProductListPage.tsx";
+import ProductFormPage from "./pages/Products/ProductFormPage.tsx";
 // import Signup from "./pages/Signup.tsx";
 import Login from "./pages/Login.tsx";
 import ChangePassword from "./pages/ChangePassword.tsx";
@@ -42,6 +44,9 @@ function App() {
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/" element={<Login />} />
         <Route path="" element={<RequireAuth><Layout /></RequireAuth>}>
+          <Route path="Products" element={<ProductListPage />} />
+          <Route path="Products/add" element={<ProductFormPage />} />
+          <Route path="Products/edit/:id" element={<ProductFormPage />} />
           <Route path="api1" element={<Api1 />} />
           <Route path="api2" element={<Api2 />} />
           <Route path="ObdScanReport" element={<ObdScanReport />} />
