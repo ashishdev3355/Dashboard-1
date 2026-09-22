@@ -28,6 +28,8 @@ import FaultCodeCauses from "./Services/FaultCodeCauses.tsx";
 import FaultCodeList from "./Services/FaultCodeList.tsx";
 import ProductListPage from "./pages/Products/ProductListPage.tsx";
 import ProductFormPage from "./pages/Products/ProductFormPage.tsx";
+import BlogListPage from "./pages/Blog/BlogListPage.tsx";
+import BlogFormPage from "./pages/Blog/BlogFormPage.tsx";
 // import Signup from "./pages/Signup.tsx";
 import Login from "./pages/Login.tsx";
 import ChangePassword from "./pages/ChangePassword.tsx";
@@ -47,6 +49,9 @@ function App() {
           <Route path="Products" element={<ProductListPage />} />
           <Route path="Products/add" element={<ProductFormPage />} />
           <Route path="Products/edit/:id" element={<ProductFormPage />} />
+          <Route path="Blog" element={<BlogListPage />} />
+          <Route path="Blog/add" element={<BlogFormPage />} />
+          <Route path="Blog/edit/:id" element={<BlogFormPage />} />
           <Route path="api1" element={<Api1 />} />
           <Route path="api2" element={<Api2 />} />
           <Route path="ObdScanReport" element={<ObdScanReport />} />

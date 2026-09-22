@@ -9,6 +9,7 @@ const menuItems: MenuItem[] = [
   { label: "Role Management", path: "/AdminUsers" },
   { label: "Products", path: "/Products" },
   { label: "Add Product", path: "/Products/add" },
+  { label: "Blog", path: "/Blog" },
   { label: "Users Table", path: "/UsersTable" },
   { label: "Covarage Data", path: "/Api1" },
   { label: "Mechanic Commands", path: "/Api2" },
