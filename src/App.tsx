@@ -11,6 +11,7 @@ import OdometerDetails from './Services/OdometerDetails.tsx'
 import FileUploader from './Services/Updatecommand.tsx'
 import UsersTable from "./Services/UsersTable.tsx";
 import AdminUsersTable from "./Services/AdminUsersTable.tsx";
+import UserVehicles from "./Services/UserVehicles.tsx";
 import ObdScanReport from "./Services/Scandetail.tsx";
 import ScanDetailPage from "./Compontens/ScanDetails/ScanDetailsPage.tsx";
 import SpdetailsPage from "./Compontens/SpecialFunctions/SpdetailsPage.tsx";
@@ -63,6 +64,7 @@ function App() {
           <Route path="BikeMakeList" element={<BikeMakeList />} />
           <Route path="UsersTable" element={<UsersTable />} />
           <Route path="AdminUsers" element={<AdminUsersTable />} />
+          <Route path="UserVehicles" element={<UserVehicles />} />
           <Route path="CommandFetcher" element={<CommandFetcher />} />
           <Route path="Customcommands1" element={<Customcommands1 />} />
           <Route path="ActuationFetcher" element={<ActuationFetcher />} />

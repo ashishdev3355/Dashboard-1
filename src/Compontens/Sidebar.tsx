@@ -11,6 +11,7 @@ const menuItems: MenuItem[] = [
   { label: "Add Product", path: "/Products/add" },
   { label: "Blog", path: "/Blog" },
   { label: "Users Table", path: "/UsersTable" },
+  { label: "User Vehicles", path: "/UserVehicles" },
   { label: "Covarage Data", path: "/Api1" },
   { label: "Mechanic Commands", path: "/Api2" },
   { label: "Cars Scans", path: "/ObdScanReport" },
@@ -35,7 +36,8 @@ const menuItems: MenuItem[] = [
 
 function Sidebar() {
   const role_id = localStorage.getItem("role_id");
-  const filteredMenuItems = menuItems.filter(item => item.path !== "/AdminUsers" || role_id === "1");
+  const adminOnlyPaths = ["/AdminUsers", "/UserVehicles"];
+  const filteredMenuItems = menuItems.filter(item => !adminOnlyPaths.includes(item.path) || role_id === "1");
 
   return (
     <div className="bg-gray-100 h-screen w-64 p-4 shadow-lg overflow-y-auto">
